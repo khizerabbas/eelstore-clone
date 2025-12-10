@@ -64,7 +64,6 @@
                     </div>
                     <div class="leading-tight hidden sm:block">
                         <div class="font-bold text-lg tracking-wide">Usman Electronics</div>
-                        <div class="text-xs text-gray-300">The Electric Store</div>
                     </div>
                 </a>
             </div>
@@ -226,8 +225,8 @@
 
 
         {{-- Secondary nav: shop by categories + main menu --}}
-        <nav class="bg-slate-900 text-slate-100 border-t border-slate-800">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav class="bg-slate-900 text-slate-100 border-t border-slate-800 hidden md:block">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-12">
                     {{-- left side empty for now; can be used later if needed --}}
                     <div class="flex-1"></div>
@@ -238,7 +237,7 @@
                         </a>
 
                         {{-- Categories dropdown (desktop) --}}
-                        <div class="relative group">
+                        <div class="relative group pb-2">
                             <button type="button"
                                     class="inline-flex items-center gap-1 hover:text-yellow-400">
                                 <span>Categories</span>
@@ -246,7 +245,7 @@
                             </button>
 
                             <div
-                                class="absolute left-1/2 z-30 mt-2 hidden w-56 -translate-x-1/2 rounded-md bg-slate-900 shadow-lg ring-1 ring-black ring-opacity-5 group-hover:block">
+                                class="absolute left-1/2 top-full z-30 hidden w-56 -translate-x-1/2 rounded-md bg-slate-900 shadow-lg ring-1 ring-black ring-opacity-5 group-hover:block">
                                 <div class="py-1 max-h-80 overflow-y-auto text-sm">
                                     @foreach ($headerCategories as $category)
                                         <a
@@ -258,6 +257,7 @@
                                 </div>
                             </div>
                         </div>
+
 
                         <a href="{{ route('shop.index') }}" class="hover:text-yellow-400">
                             Shop
