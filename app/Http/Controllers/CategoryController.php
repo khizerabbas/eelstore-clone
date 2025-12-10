@@ -8,21 +8,25 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    public function show(string $slug)
+    public function show(Request $request, string $slug)
     {
         $category = Category::where('slug', $slug)
             ->where('is_active', true)
             ->firstOrFail();
 
-        $products = Product::with('company')
-            ->where('category_id', $category->id)
-            ->where('is_active', true)
-            ->orderBy('is_featured', 'desc')
-            ->orderBy('name')
-            ->get();
+        // Start with current query string (?sort=..., ?per_page=..., etc.)
+        $query = $request->query();
 
-        $hasCompanies = $products->whereNotNull('company_id')->isNotEmpty();
+        // Make sure categories[] is an array and contains this category ID
+        $selected = (array) ($query['categories'] ?? []);
 
-        return view('category.show', compact('category', 'products', 'hasCompanies'));
+        if (! in_array($category->id, $selected)) {
+            $selected[] = $category->id;
+        }
+
+        $query['categories'] = $selected;
+
+        // Forward to the shop page with this category pre-selected
+        return redirect()->route('shop.index', $query);
     }
 }
