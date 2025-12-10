@@ -237,8 +237,8 @@
                         </a>
 
                         {{-- Categories dropdown (desktop) --}}
-                        <div class="relative group pb-2">
-                            <button type="button"
+                        <div class="relative group">
+                        <button type="button"
                                     class="inline-flex items-center gap-1 hover:text-yellow-400">
                                 <span>Categories</span>
                                 <span class="text-xs">▾</span>
