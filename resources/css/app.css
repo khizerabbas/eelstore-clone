@@ -65,3 +65,79 @@
     display: none;
 }
 
+/* Basic position for dropdown */
+.main-nav {
+    display: flex;
+    gap: 2rem; /* adjust to match your spacing */
+    align-items: center;
+}
+
+/* Make sure the list item is the positioning context */
+.nav-categories {
+    position: relative;
+}
+
+/* Hidden by default (desktop) */
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 200px;
+    background-color: #101827; /* match your header bg */
+    border-radius: 4px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    padding: 0.5rem 0;
+    display: none;
+    z-index: 50;
+}
+
+/* Dropdown items */
+.nav-dropdown-item {
+    display: block;
+    padding: 0.4rem 1rem;
+    color: #fff;
+    text-decoration: none;
+    white-space: nowrap;
+    font-size: 0.95rem;
+}
+
+.nav-dropdown-item:hover {
+    background-color: #1f2937; /* slightly lighter */
+}
+
+/* Show on hover – desktop */
+.nav-categories:hover .nav-dropdown {
+    display: block;
+}
+
+/* MOBILE: make dropdown full-width and stacked nicely */
+@media (max-width: 768px) {
+    .main-nav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .nav-categories {
+        width: 100%;
+        position: static; /* so dropdown can be full width */
+    }
+
+    .nav-dropdown {
+        position: static;
+        transform: none;
+        width: 100%;
+        box-shadow: none;
+        border-radius: 0;
+        margin-top: 0.25rem;
+        display: block;           /* always visible on mobile */
+        padding-left: 1.5rem;     /* indent under “Categories” */
+    }
+
+    .nav-dropdown-item {
+        padding: 0.25rem 0;
+    }
+}
+
+

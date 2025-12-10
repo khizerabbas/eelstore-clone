@@ -27,6 +27,15 @@
     $wishlist = session('wishlist', []);
     $wishlistCount = is_array($wishlist) ? count($wishlist) : 0;
 @endphp
+
+@php
+    use App\Models\Category;
+
+    $headerCategories = Category::where('is_active', true)
+        ->orderBy('name')
+        ->get();
+@endphp
+
 <div class="min-h-screen flex flex-col">
 
     {{-- Top contact bar --}}
@@ -281,11 +290,31 @@
 
             <div>
                 <h3 class="font-semibold text-sm uppercase tracking-wide mb-3">Menu</h3>
-                <ul class="space-y-2 text-sm">
-                    <li><a href="{{ route('home') }}" class="hover:text-amber-400">Home</a></li>
-                    <li><a href="#" class="hover:text-amber-400">Shop</a></li>
-                    <li><a href="{{ route('contact.show') }}" class="hover:text-amber-400">Contact Us</a></li>
+                <ul class="main-nav">
+                    <li><a href="{{ route('home') }}">Home</a></li>
+
+                    {{-- Categories dropdown --}}
+                    <li class="nav-item nav-categories">
+                        <a href="javascript:void(0)" class="nav-link">
+                            Categories
+                        </a>
+
+                        <div class="nav-dropdown">
+                            @foreach ($headerCategories as $category)
+                                <a
+                                    href="{{ route('category.show', $category->slug) }}"
+                                    class="nav-dropdown-item"
+                                >
+                                    {{ $category->name }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </li>
+
+                    <li><a href="{{ route('shop.index') }}">Shop</a></li>
+                    <li><a href="{{  route('contact.show') }}">Contact Us</a></li>
                 </ul>
+
             </div>
 
             <div>
