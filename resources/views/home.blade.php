@@ -88,7 +88,7 @@
             @foreach($grouped as $companyName => $products)
                 <div class="mb-6">
                     <h3 class="text-sm font-semibold mb-2 text-gray-700">{{ $companyName }}</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         @foreach($products as $product)
                             @include('partials.product-card', ['product' => $product])
                         @endforeach

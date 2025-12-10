@@ -6,24 +6,27 @@
     $showWishlistIcon = $showWishlistIcon ?? true;
 @endphp
 
-<div
-    class="group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md hover:-translate-y-1">
+<div class="group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden
+            transition-all hover:shadow-md hover:-translate-y-1 flex flex-col h-full">
 
     {{-- Top bar: SALE + wishlist --}}
     <div class="absolute inset-x-0 top-0 z-10 flex items-start justify-between px-2 pt-2 pointer-events-none">
         <div>
             @if($product->is_on_sale)
-                <span
-                    class="inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-auto">
-                SALE
-            </span>
+                <span class="inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-auto">
+                    SALE
+                </span>
             @endif
         </div>
 
         @if($showWishlistIcon)
             <div class="pointer-events-auto">
-                <form action="{{ route('wishlist.add', $product) }}" method="POST" data-ajax="wishlist"
-                      data-product-id="{{ $product->id }}">
+                <form
+                    action="{{ route('wishlist.add', $product) }}"
+                    method="POST"
+                    data-ajax="wishlist"
+                    data-product-id="{{ $product->id }}"
+                >
                     @csrf
                     <button
                         type="submit"
@@ -41,27 +44,25 @@
         @endif
     </div>
 
-
     {{-- Product image / placeholder --}}
-    <a href="{{ route('product.show', $product->slug) }}"
+    <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
        class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center">
-        {{-- TODO: replace with real image when available --}}
+        {{-- TODO: replace with real image later --}}
         <span class="text-3xl">⚡</span>
     </a>
 
     {{-- Text content --}}
-    <div class="p-4 space-y-2 pb-4 md:pb-10">
-        @if($product->company)
-            <span class="text-xs text-gray-500 uppercase min-h-[1rem] block">
-    {{ $product->company->name ?? '' }}
-</span>
-        @endif
+    <div class="flex-1 p-4 pb-4 md:pb-10 flex flex-col space-y-2">
+        {{-- Company row – fixed min height so cards align even if no company --}}
+        <span class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold min-h-[1rem] block">
+            {{ optional($product->company)->name }}
+        </span>
 
-        <h3 class="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">
-            <a href="{{ route('product.show', $product->slug) }}" class="hover:text-slate-900">
-                <p class="font-semibold text-lg min-h-[3rem]">
-                    {{ $product->name }}
-                </p>
+        {{-- Title --}}
+        <h3 class="text-sm font-semibold text-gray-800 leading-snug">
+            <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
+               class="hover:text-slate-900">
+                {{ $product->name }}
             </a>
         </h3>
 
@@ -81,11 +82,15 @@
             @endif
         </div>
 
+        {{-- Short description – allowed to grow, but we still keep the CTA at the bottom --}}
         @if($product->short_description)
-                <p class="text-gray-600 text-sm min-h-[3rem]">
-                    {{ $product->short_description }}
-                </p>
+            <p class="text-xs text-gray-500">
+                {{ $product->short_description }}
+            </p>
         @endif
+
+        {{-- This pushes everything above up and leaves space for the bottom action bar --}}
+        <div class="mt-auto"></div>
     </div>
 
     {{-- Desktop: hover action bar --}}
@@ -94,11 +99,12 @@
                 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-150">
 
         {{-- Add to Cart --}}
-        <form action="{{ route('cart.add', $product) }}"
-              method="POST"
-              data-ajax="cart"
-              data-product-id="{{ $product->id }}">
-
+        <form
+            action="{{ route('cart.add', $product) }}"
+            method="POST"
+            data-ajax="cart"
+            data-product-id="{{ $product->id }}"
+        >
             @csrf
             <input type="hidden" name="quantity" value="1">
             <button
@@ -111,7 +117,7 @@
 
         {{-- View Details --}}
         <a
-            href="{{ route('product.show', $product->slug) }}"
+            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
             class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
         >
             👁️ <span>Details</span>
@@ -121,17 +127,18 @@
     {{-- Mobile: full-width buttons --}}
     <div class="md:hidden px-4 pb-4 space-y-2">
         <a
-            href="{{ route('product.show', $product->slug) }}"
+            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
             class="block w-full text-center text-xs font-semibold rounded-md bg-slate-900 text-white py-2 hover:bg-slate-800"
         >
             View Details
         </a>
 
-        <form action="{{ route('cart.add', $product) }}"
-              method="POST"
-              data-ajax="cart"
-              data-product-id="{{ $product->id }}">
-
+        <form
+            action="{{ route('cart.add', $product) }}"
+            method="POST"
+            data-ajax="cart"
+            data-product-id="{{ $product->id }}"
+        >
             @csrf
             <input type="hidden" name="quantity" value="1">
             <button

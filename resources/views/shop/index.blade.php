@@ -210,7 +210,7 @@
                         Try adjusting your filters or selecting different categories.
                     </p>
                 @else
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         @foreach($products as $product)
                             @include('partials.product-card', ['product' => $product])
                         @endforeach
