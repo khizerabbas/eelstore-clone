@@ -8,11 +8,6 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<div id="toast"
-     class="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-md bg-slate-900 text-white text-xs shadow-lg
-            opacity-0 pointer-events-none transition-opacity duration-300 hidden">
-    <!-- message injected by JS -->
-</div>
 <body class="font-sans antialiased bg-gray-100">
 @php
     $cart = session('cart', []);
@@ -35,7 +30,11 @@
         ->orderBy('name')
         ->get();
 @endphp
-
+<div id="toast"
+     class="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-md bg-slate-900 text-white text-xs shadow-lg
+            opacity-0 pointer-events-none transition-opacity duration-300 hidden">
+    <!-- message injected by JS -->
+</div>
 <div class="min-h-screen flex flex-col">
 
     {{-- Top contact bar --}}
@@ -167,101 +166,111 @@
         </div>
 
         {{-- Mobile search panel --}}
-        <div id="mobile-search-panel" class="md:hidden hidden bg-slate-900 border-t border-slate-800">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                <form id="mobile-search-form" action="{{ route('search') }}" method="GET" class="space-y-2">
-                    {{-- Category dropdown --}}
-                    <select
-                        name="category"
-                        class="w-full bg-slate-800 border border-slate-700 text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                        <option value="">All categories</option>
-                        @isset($searchCategories)
-                            @foreach($searchCategories as $cat)
-                                <option
-                                    value="{{ $cat->id }}"
-                                    {{ (string)request('category') === (string)$cat->id ? 'selected' : '' }}
-                                >
-                                    {{ $cat->name }}
-                                </option>
-                            @endforeach
-                        @endisset
-                    </select>
+        {{-- Mobile nav panel --}}
+        <div id="mobile-menu-panel"
+             class="lg:hidden hidden bg-slate-900 text-slate-100 border-t border-slate-800">
+            <div class="px-4 pt-3 pb-4 space-y-3">
 
-                    {{-- Search input --}}
-                    <div class="flex">
-                        <input
-                            type="text"
-                            name="q"
-                            value="{{ request('q') }}"
-                            placeholder="Search for products"
-                            class="flex-1 bg-slate-800 border border-slate-700 text-sm rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        >
-                        <button
-                            type="submit"
-                            class="px-3 rounded-r-md border border-l-0 border-slate-700 bg-slate-800 text-gray-200 hover:text-amber-400"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                            </svg>
-                        </button>
+                <a href="{{ route('home') }}" class="block py-1">
+                    Home
+                </a>
+
+                {{-- Categories accordion (mobile) --}}
+                <details class="border-t border-slate-800 pt-3">
+                    <summary class="list-none flex items-center justify-between py-1 cursor-pointer">
+                        <span>Categories</span>
+                        <span class="text-xs">▾</span>
+                    </summary>
+
+                    <div class="mt-2 space-y-1 pl-3 max-h-64 overflow-y-auto text-sm">
+                        @foreach ($headerCategories as $category)
+                            <a href="{{ route('category.show', $category->slug) }}"
+                               class="block py-1">
+                                {{ $category->name }}
+                            </a>
+                        @endforeach
                     </div>
-                </form>
+                </details>
+
+                <a href="{{ route('shop.index') }}" class="block py-1">
+                    Shop
+                </a>
+
+                <a href="{{ route('contact.show') }}" class="block py-1">
+                    Contact Us
+                </a>
+
+                {{-- Mobile Wishlist / Cart (visible only on small screens) --}}
+                <div class="mt-3 flex items-center space-x-4 border-t border-slate-800 pt-3">
+                    <a href="{{ route('wishlist.index') }}" class="flex items-center gap-2 text-sm">
+                        <span>❤️</span>
+                        <span>
+                    Wishlist (
+                    <span id="wishlist-count-mobile">{{ $wishlistCount }}</span>
+                    )
+                </span>
+                    </a>
+
+                    <a href="{{ route('cart.index') }}" class="flex items-center gap-2 text-sm">
+                        <span>🛒</span>
+                        <span>
+                    Cart (
+                    <span id="cart-count-mobile">{{ $cartCount }}</span>
+                    )
+                </span>
+                    </a>
+                </div>
             </div>
         </div>
+
 
 
         {{-- Secondary nav: shop by categories + main menu --}}
-        <div class="bg-slate-800 border-t border-slate-700">
+        <nav class="bg-slate-900 text-slate-100 border-t border-slate-800">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="hidden md:flex items-center justify-between h-11">
-                    <div></div> {{-- left side empty for now; can be used later if needed --}}
+                <div class="flex items-center justify-between h-12">
+                    {{-- left side empty for now; can be used later if needed --}}
+                    <div class="flex-1"></div>
 
-                    <nav class="flex items-center gap-6 text-sm">
-                        <a href="{{ route('home') }}" class="hover:text-amber-400">Home</a>
-                        <a href="{{ route('shop.index') }}" class="hover:text-amber-400">Shop</a>
-                        <a href="{{ route('contact.show') }}" class="hover:text-amber-400">Contact Us</a>
-                    </nav>
-                </div>
+                    <div class="flex items-center space-x-8 text-sm font-medium">
+                        <a href="{{ route('home') }}" class="hover:text-yellow-400">
+                            Home
+                        </a>
 
-                {{-- Mobile nav panel --}}
-                <div id="mobile-menu-panel" class="md:hidden hidden border-t border-slate-700 pb-3">
-                    <nav class="pt-3 flex flex-col gap-2 text-sm">
-                        <a href="{{ route('home') }}" class="px-2 py-2 rounded-md hover:bg-slate-700">Home</a>
-                        <a href="{{ route('shop.index') }}" class="px-2 py-2 rounded-md hover:bg-slate-700">Shop</a>
-                        <a href="{{ route('contact.show') }}" class="px-2 py-2 rounded-md hover:bg-slate-700">Contact Us</a>
+                        {{-- Categories dropdown (desktop) --}}
+                        <div class="relative group">
+                            <button type="button"
+                                    class="inline-flex items-center gap-1 hover:text-yellow-400">
+                                <span>Categories</span>
+                                <span class="text-xs">▾</span>
+                            </button>
 
-                        {{-- Mobile Wishlist / Cart (visible only on small screens) --}}
-                        <div class="md:hidden flex items-center gap-4 ml-3">
-                            <a href="{{ route('wishlist.index') }}" class="flex items-center gap-1 text-xs text-gray-100">
-                                <span>❤️</span>
-                                <span>Wishlist</span>
-                                <span
-                                    id="wishlist-count-mobile"
-                                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-semibold"
-                                >
-            {{ $wishlistCount }}
-        </span>
-                            </a>
-
-                            <a href="{{ route('cart.index') }}" class="flex items-center gap-1 text-xs text-gray-100">
-                                <span>🛒</span>
-                                <span>Cart</span>
-                                <span
-                                    id="cart-count-mobile"
-                                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-semibold"
-                                >
-            {{ $cartCount }}
-        </span>
-                            </a>
+                            <div
+                                class="absolute left-1/2 z-30 mt-2 hidden w-56 -translate-x-1/2 rounded-md bg-slate-900 shadow-lg ring-1 ring-black ring-opacity-5 group-hover:block">
+                                <div class="py-1 max-h-80 overflow-y-auto text-sm">
+                                    @foreach ($headerCategories as $category)
+                                        <a
+                                            href="{{ route('category.show', $category->slug) }}"
+                                            class="block px-4 py-2 hover:bg-slate-800">
+                                            {{ $category->name }}
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
 
-                    </nav>
-                </div>
+                        <a href="{{ route('shop.index') }}" class="hover:text-yellow-400">
+                            Shop
+                        </a>
 
+                        <a href="{{ route('contact.show') }}" class="hover:text-yellow-400">
+                            Contact Us
+                        </a>
+                    </div>
+                </div>
             </div>
-        </div>
+        </nav>
+
     </header>
 
     {{-- Page content --}}
@@ -292,25 +301,6 @@
                 <h3 class="font-semibold text-sm uppercase tracking-wide mb-3">Menu</h3>
                 <ul class="main-nav">
                     <li><a href="{{ route('home') }}">Home</a></li>
-
-                    {{-- Categories dropdown --}}
-                    <li class="nav-item nav-categories">
-                        <a href="javascript:void(0)" class="nav-link">
-                            Categories
-                        </a>
-
-                        <div class="nav-dropdown">
-                            @foreach ($headerCategories as $category)
-                                <a
-                                    href="{{ route('category.show', $category->slug) }}"
-                                    class="nav-dropdown-item"
-                                >
-                                    {{ $category->name }}
-                                </a>
-                            @endforeach
-                        </div>
-                    </li>
-
                     <li><a href="{{ route('shop.index') }}">Shop</a></li>
                     <li><a href="{{  route('contact.show') }}">Contact Us</a></li>
                 </ul>
