@@ -1,3 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Clean select: hide native arrow across browsers, we use our own ▾ icon */
+.select-clean {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none !important;
+    background-color: #ffffff;
+}
+
+/* Hide the old IE/Edge dropdown arrow, just in case */
+.select-clean::-ms-expand {
+    display: none;
+}
+
+/* === Price slider (noUiSlider) custom theme === */
+
+#price-slider.noUi-target {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    padding: 0;
+    margin-top: 4px;
+}
+
+/* Track container */
+#price-slider .noUi-connects {
+    border-radius: 9999px; /* full rounded */
+    background: #e5e7eb;   /* gray-200 */
+    height: 4px;
+}
+
+/* Selected range */
+#price-slider .noUi-connect {
+    background: #fbbf24;   /* amber-400 */
+}
+
+/* Handles */
+#price-slider .noUi-handle {
+    width: 14px;
+    height: 18px;
+    border-radius: 6px;
+    border: 2px solid #fbbf24; /* amber-400 outline */
+    background: #111827;       /* slate-900 */
+    box-shadow: none;
+    cursor: pointer;
+    top: -7px;                 /* vertically center over 4px track */
+}
+
+/* Remove default handle decorations */
+#price-slider .noUi-handle:before,
+#price-slider .noUi-handle:after {
+    display: none;
+}
+
+/* Improve touch area without changing visual size */
+#price-slider .noUi-touch-area {
+    cursor: pointer;
+}
+
+/* Optional: hide tooltips if noUiSlider ever adds them */
+#price-slider .noUi-tooltip {
+    display: none;
+}
+
