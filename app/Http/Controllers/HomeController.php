@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HomepageSlider;
 use App\Models\Product;
 
 class HomeController extends Controller
@@ -31,6 +32,12 @@ class HomeController extends Controller
             ->take(12)
             ->get();
 
-        return view('home', compact('featuredWires', 'featuredLighting', 'featuredAll'));
+        $heroSliders = HomepageSlider::where('is_active', true)
+            ->orderBy('sort_order')
+            ->limit(3)
+            ->get();
+
+
+        return view('home', compact('featuredWires', 'featuredLighting', 'featuredAll','heroSliders'));
     }
 }
