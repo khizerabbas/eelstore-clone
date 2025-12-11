@@ -201,57 +201,30 @@
         </div>
     </section>
 
-
-
     {{-- Featured Wires (grouped by company) --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div
-            class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-            <h2 class="text-xl font-semibold">Wires (Featured)</h2>
-            <a href="{{ route('category.show', 'wires') }}" class="text-xs text-amber-600 hover:text-amber-500">
-                View all wires →
-            </a>
-        </div>
-
-        @if($featuredWires->isEmpty())
-            <p class="text-sm text-gray-600">No featured wires yet.</p>
-        @else
-            @php
-                $grouped = $featuredWires->groupBy(fn($p) => optional($p->company)->name ?? 'Other');
-            @endphp
-
-            @foreach($grouped as $companyName => $products)
+    @foreach($homepageCategorySections as $section)
+        @php
+            $category = $section->category;
+            $products = $section->products;
+        @endphp
+        @if($category && $products->isNotEmpty())
+            <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <div
+                    class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
+                    <h2 class="text-xl font-semibold"> {{ $category->name }}</h2>
+                    <a href="{{ route('category.show', $category->slug) }}"
+                       class="text-xs text-amber-600 hover:text-amber-500">
+                        View all →
+                    </a>
+                </div>
                 <div class="mb-6">
-                    <h3 class="text-sm font-semibold mb-2 text-gray-700">{{ $companyName }}</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         @foreach($products as $product)
                             @include('partials.product-card', ['product' => $product])
                         @endforeach
                     </div>
                 </div>
-            @endforeach
+            </section>
         @endif
-    </section>
-
-    {{-- Featured Lighting --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
-        <div
-            class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-            <h2 class="text-xl font-semibold">Lighting (Featured)</h2>
-            <a href="{{ route('category.show', 'lighting') }}" class="text-xs text-amber-600 hover:text-amber-500">
-                View all lighting →
-            </a>
-        </div>
-
-        @if($featuredLighting->isEmpty())
-            <p class="text-sm text-gray-600">No featured lighting products yet.</p>
-        @else
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                @foreach($featuredLighting as $product)
-                    @include('partials.product-card', ['product' => $product])
-                @endforeach
-            </div>
-        @endif
-    </section>
-
+    @endforeach
 @endsection

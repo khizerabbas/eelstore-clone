@@ -4,40 +4,36 @@ namespace App\Http\Controllers;
 
 use App\Models\HomepageSlider;
 use App\Models\Product;
-
+use App\Models\HomepageCategorySection;
 class HomeController extends Controller
 {
     public function index()
     {
-        // Featured wires (with companies)
-        $featuredWires = Product::with(['company', 'category'])
-            ->whereHas('category', fn($q) => $q->where('slug', 'wires'))
-            ->where('is_active', true)
-            ->where('is_featured', true)
-            ->take(8)
-            ->get();
-
-        // Featured lighting (no companies required)
-        $featuredLighting = Product::with(['category'])
-            ->whereHas('category', fn($q) => $q->where('slug', 'lighting'))
-            ->where('is_active', true)
-            ->where('is_featured', true)
-            ->take(8)
-            ->get();
-
-        // General featured products (for a “Featured” section)
-        $featuredAll = Product::with(['category', 'company'])
-            ->where('is_active', true)
-            ->where('is_featured', true)
-            ->take(12)
-            ->get();
 
         $heroSliders = HomepageSlider::where('is_active', true)
             ->orderBy('sort_order')
             ->limit(3)
             ->get();
 
+        // Load up to 3 homepage category sections, with categories
+        $homepageCategorySections = HomepageCategorySection::with('category')
+            ->where('is_active', true)
+            ->orderBy('position')
+            ->get()
+            // hide sections where no category is selected
+            ->filter(fn ($section) => $section->category !== null)
+            ->values();
 
-        return view('home', compact('featuredWires', 'featuredLighting', 'featuredAll','heroSliders'));
+        // Attach products for each section/category
+        $homepageCategorySections->each(function ($section) {
+            $section->products = Product::query()
+                ->where('is_active', true)
+                ->where('category_id', $section->category_id) // adjust if you use a pivot/other relation
+                ->latest()
+                ->take(8)
+                ->get();
+        });
+
+        return view('home', compact('heroSliders', 'homepageCategorySections'));
     }
 }
