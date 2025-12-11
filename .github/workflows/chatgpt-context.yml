@@ -1,0 +1,48 @@
+name: Build ChatGPT Context Bundle
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-context:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Build context file
+        run: |
+          mkdir -p docs
+
+          # Start fresh
+          echo "=== routes/web.php ===" > docs/chatgpt-context.txt
+          cat routes/web.php >> docs/chatgpt-context.txt
+
+          echo -e "\n\n=== app/Http/Controllers ===" >> docs/chatgpt-context.txt
+          find app/Http/Controllers -name '*.php' | sort | while read file; do
+            echo -e "\n\n--- FILE: $file ---\n" >> docs/chatgpt-context.txt
+            cat "$file" >> docs/chatgpt-context.txt
+          done
+
+          echo -e "\n\n=== resources/views ===" >> docs/chatgpt-context.txt
+          find resources/views -name '*.blade.php' | sort | while read file; do
+            echo -e "\n\n--- FILE: $file ---\n" >> docs/chatgpt-context.txt
+            cat "$file" >> docs/chatgpt-context.txt
+          done
+
+          echo -e "\n\n=== app/Models ===" >> docs/chatgpt-context.txt
+          find app/Models -name '*.php' | sort | while read file; do
+          echo -e "\n\n--- FILE: $file ---\n" >> docs/chatgpt-context.txt
+          cat "$file" >> docs/chatgpt-context.txt
+          done
+
+
+      - name: Commit updated context file
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update ChatGPT context bundle"
+          file_pattern: docs/chatgpt-context.txt
