@@ -38,6 +38,9 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->passwordReset()
             ->profile(isSimple: false)
+            // Bell icon: import/export results and other admin notifications
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             // Authenticator-app 2FA. Every admin must set it up when ADMIN_REQUIRE_2FA is true (default in production).
             ->multiFactorAuthentication(
                 AppAuthentication::make()

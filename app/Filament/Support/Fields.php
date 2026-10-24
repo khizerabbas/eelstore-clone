@@ -27,7 +27,7 @@ class Fields
             ->live(onBlur: true)
             ->afterStateUpdated(function (string $operation, ?string $state, Set $set, Get $get) {
                 if ($operation === 'create' || blank($get('slug'))) {
-                    $set('slug', Str::slug((string) $state));
+                    $set('slug', Str::slug(str_replace(['/', '\\'], ' ', (string) $state))); // "7/29 wire" → 7-29-wire
                 }
             });
     }
