@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Support\ProductSearch;
 use App\Models\Category;
 use App\Models\Company;
 use Illuminate\Http\Request;
@@ -231,12 +232,11 @@ class ProductController extends Controller
             $productsQuery = Product::with(['category', 'company'])
                 ->where('is_active', true);
 
+            // Forgiving matching: "2.5mm" ↔ "2.5 mm", any word order, brand/category/SKU too (see ProductSearch)
             if ($queryText !== '') {
-                $productsQuery->where(function ($q) use ($queryText) {
-                    $q->where('name', 'like', "%{$queryText}%")
-                        ->orWhere('short_description', 'like', "%{$queryText}%")
-                        ->orWhere('description', 'like', "%{$queryText}%");
-                });
+                ProductSearch::apply($productsQuery, $queryText);
+            } else {
+                $productsQuery->orderBy('name');
             }
 
             if (!empty($categoryId)) {
@@ -244,7 +244,6 @@ class ProductController extends Controller
             }
 
             $products = $productsQuery
-                ->orderBy('name')
                 ->paginate(12)
                 ->withQueryString();
         }
