@@ -148,7 +148,9 @@ Cart → /checkout (name*, phone*, email, address, comment)
 > **Also done:** WebP copies of every upload (thumb 480 px / large 1280 px, `app:optimize-images` to backfill; replaced
 > or deleted images are cleaned up), "No preview available" placeholder for missing/broken images (custom one uploadable),
 > real indexable category pages (`/category/{slug}`, includes sub-categories).
-> **Still to do:** brand pages, deals/new-arrivals/featured blocks, wire length estimator, bulk quote form.
+> **Also done:** brand pages (`/brand/{slug}`), home blocks (Today's deals, Featured, Shop by brand, New arrivals – each switchable),
+> admin activity log (Settings → Activity log), app timezone Asia/Karachi.
+> **Still to do:** wire length estimator, bulk quote form.
 
 - Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
 - Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.
@@ -176,6 +178,8 @@ Cart → /checkout (name*, phone*, email, address, comment)
 - Rate limits on every POST route. Strict upload validation (re-encode images, block SVG/PHP). Policies on every admin resource.
 - `composer audit` / `npm audit`, DB backups (`spatie/laravel-backup`), error monitoring, and a queue worker plus scheduler (cron on shared hosting).
 - Cleanup: remove `welcome.blade.php` and the leftover Breeze customer views.
+
+> **Deployment:** the complete first-launch checklist (server, php.ini, `.env`, cron, commands, clean-up) is in [docs/GO_LIVE.md](GO_LIVE.md).
 
 ## 6. Local setup (current)
 

@@ -65,8 +65,12 @@
             <div class="space-y-4">
                 @if($product->company)
                     <div class="text-sm text-gray-600">
-                        <span class="font-semibold">Company:</span>
-                        <span>{{ $product->company->name }}</span>
+                        <span class="font-semibold">Brand:</span>
+                        @if($product->company->is_active)
+                            <a href="{{ route('brand.show', $product->company->slug) }}" class="text-accent-ink hover:underline">{{ $product->company->name }}</a>
+                        @else
+                            <span>{{ $product->company->name }}</span>
+                        @endif
                     </div>
                 @endif
 

@@ -49,6 +49,12 @@ return [
     'history_max_orders'     => 20,
 
     /*
+    | Run the queue worker from the scheduler (one cron line, works on shared hosting).
+    | Turn off when the server runs `php artisan queue:work` under Supervisor.
+    */
+    'queue_worker_via_scheduler' => env('QUEUE_WORKER_VIA_SCHEDULER', true),
+
+    /*
     | Abuse limits for order requests.
     */
     'limits' => [

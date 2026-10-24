@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 // CMS pages managed in the admin panel (About, Delivery & COD, Returns, Privacy, Terms, FAQ …)
 class Page extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'title',
         'slug',

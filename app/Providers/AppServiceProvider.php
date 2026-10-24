@@ -45,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function (Login $event) {
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+                \App\Models\AdminActivity::record('login', 'Logged in');
             }
         });
 

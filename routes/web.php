@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\OrderPrintController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
@@ -20,6 +21,7 @@ Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 
 Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('category.show');
+Route::get('/brand/{slug}', [BrandController::class, 'show'])->name('brand.show');
 
 Route::get('/product/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/search', [ProductController::class, 'search'])->name('search');

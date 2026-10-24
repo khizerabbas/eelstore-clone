@@ -73,6 +73,13 @@ class CompanyResource extends Resource
                     ->label('Visible'),
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('view_on_site')
+                    ->label('')
+                    ->tooltip('View on website')
+                    ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
+                    ->color('gray')
+                    ->url(fn (Company $record) => route('brand.show', $record->slug), shouldOpenInNewTab: true)
+                    ->visible(fn (Company $record) => $record->is_active),
                 EditAction::make(),
                 DeleteAction::make()
                     ->modalDescription('Products of this brand are kept, they just lose the brand.'),

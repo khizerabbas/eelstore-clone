@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Company extends Model
 {
-    use HasFactory, HasImageVariants;
+    use HasFactory, HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {

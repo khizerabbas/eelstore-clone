@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Enums\OrderStatus;
 use App\Support\PakistaniPhone;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'customer_name',
         'customer_phone',

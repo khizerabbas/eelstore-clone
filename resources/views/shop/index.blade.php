@@ -2,53 +2,74 @@
 
 @php
     use App\Support\Content;
+    use App\Support\StructuredData;
+    use Illuminate\Support\Str;
 
+    // Plain shop, a category page (/category/{slug}) or a brand page (/brand/{slug})
     $currentCategory ??= null;
-    $filterAction = $currentCategory ? route('category.show', $currentCategory->slug) : route('shop.index');
+    $currentBrand ??= null;
+
+    if ($currentCategory) {
+        $heading      = $currentCategory->name;
+        $intro        = $currentCategory->description;
+        $pageTitle    = $currentCategory->meta_title ?: $currentCategory->name;
+        $pageDesc     = $currentCategory->meta_description ?: Str::limit((string) $currentCategory->description, 155);
+        $filterAction = route('category.show', $currentCategory->slug);
+        $crumbs       = StructuredData::categoryCrumbs($currentCategory);
+    } elseif ($currentBrand) {
+        $heading      = $currentBrand->name;
+        $intro        = $currentBrand->description;
+        $pageTitle    = $currentBrand->name;
+        $pageDesc     = Str::limit((string) ($currentBrand->description ?: $currentBrand->name . ' products at ' . \App\Models\SiteSetting::storeName()), 155);
+        $filterAction = route('brand.show', $currentBrand->slug);
+        $crumbs       = [[content('header.nav_home'), route('home')], [Content::text('pages.shop_title'), route('shop.index')], [$currentBrand->name, $filterAction]];
+    } else {
+        $heading      = Content::text('pages.shop_title');
+        $intro        = Content::text('pages.shop_intro');
+        $pageTitle    = $heading;
+        $pageDesc     = null;
+        $filterAction = route('shop.index');
+        $crumbs       = null;
+    }
 @endphp
 
-@if($currentCategory)
-    @section('title', ($currentCategory->meta_title ?: $currentCategory->name) . Content::text('seo.title_suffix'))
-    @section('meta_description', $currentCategory->meta_description ?: \Illuminate\Support\Str::limit((string) $currentCategory->description, 155))
-@else
-    @section('title', Content::text('pages.shop_title') . Content::text('seo.title_suffix'))
+@section('title', $pageTitle . Content::text('seo.title_suffix'))
+@if($pageDesc)
+    @section('meta_description', $pageDesc)
 @endif
 
-@if($currentCategory)
-    @push('meta')
-        {!! \App\Support\StructuredData::script(\App\Support\StructuredData::breadcrumbs(\App\Support\StructuredData::categoryCrumbs($currentCategory))) !!}
-    @endpush
-@endif
-
-{{-- Filter/sort combinations are not separate pages for Google --}}
-@if(request()->hasAny(['companies', 'on_sale', 'min_price', 'max_price', 'sort', 'per_page', 'page']) || (! $currentCategory && request()->has('categories')))
-    @push('meta')
+@push('meta')
+    @if($crumbs)
+        {!! StructuredData::script(StructuredData::breadcrumbs($crumbs)) !!}
+    @endif
+    {{-- Filtered/sorted/paged variants are not separate pages for Google --}}
+    @if(filled(request()->server('QUERY_STRING')))
         <meta name="robots" content="noindex, follow">
-    @endpush
-@endif
+    @endif
+@endpush
 
 @section('content')
     {{-- Header --}}
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
             <div>
-                @if($currentCategory)
+                @if($crumbs)
                     <nav class="text-xs text-gray-400 mb-1" aria-label="Breadcrumb">
-                        <a href="{{ route('home') }}" class="hover:text-accent">{{ content('header.nav_home') }}</a> /
-                        <a href="{{ route('shop.index') }}" class="hover:text-accent">{{ Content::text('pages.shop_title') }}</a>
-                        @if($currentCategory->parent)
-                            / <a href="{{ route('category.show', $currentCategory->parent->slug) }}" class="hover:text-accent">{{ $currentCategory->parent->name }}</a>
-                        @endif
+                        @foreach(array_slice($crumbs, 0, -1) as [$label, $url])
+                            <a href="{{ $url }}" class="hover:text-accent">{{ $label }}</a> /
+                        @endforeach
                     </nav>
-                    <h1 class="text-2xl font-bold">{{ $currentCategory->name }}</h1>
-                    @if($currentCategory->description)
-                        <p class="text-sm text-gray-300 mt-1 max-w-3xl">{{ $currentCategory->description }}</p>
+                @endif
+                <div class="flex items-center gap-3">
+                    @if($currentBrand?->logo)
+                        <span class="bg-white rounded-md p-1.5 h-12 flex items-center">
+                            <x-store-image :src="$currentBrand->imageUrl()" :alt="$currentBrand->name" class="max-h-9 w-auto object-contain"/>
+                        </span>
                     @endif
-                @else
-                    <h1 class="text-2xl font-bold">{{ Content::text('pages.shop_title') }}</h1>
-                    <p class="text-sm text-gray-300 mt-1">
-                        {{ Content::text('pages.shop_intro') }}
-                    </p>
+                    <h1 class="text-2xl font-bold">{{ $heading }}</h1>
+                </div>
+                @if($intro)
+                    <p class="text-sm text-gray-300 mt-1 max-w-3xl">{{ $intro }}</p>
                 @endif
             </div>
         </div>

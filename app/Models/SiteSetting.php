@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Support\PakistaniPhone;
 use Illuminate\Database\Eloquent\Model;
 
 class SiteSetting extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'store_name',
         'contact_phone',
@@ -24,6 +27,11 @@ class SiteSetting extends Model
         'footer_about',
         'opening_hours',
     ];
+
+    public function activityLabel(): string
+    {
+        return 'Website: Store & contact';
+    }
 
     // wa.me link to the store: uses whatsapp_url if set, otherwise the contact phone
     public function whatsappLink(?string $text = null): ?string

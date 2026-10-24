@@ -78,8 +78,21 @@ class HomePage extends ContentPage
                         ->maxItems(8)
                         ->addActionLabel('Add benefit'),
                 ]),
-            Section::make('Product sections')
+            Section::make('Product blocks')
+                ->description(new HtmlString('Rows of products under the hero, in this order: deals, featured, brands, new arrivals, then your '
+                    . '<a class="underline" href="' . HomepageCategorySectionResource::getUrl() . '">Home sections</a>. '
+                    . 'Featured = products with "Featured on the home page" switched on. Deals = products on sale.'))
+                ->columns(2)
                 ->schema([
+                    Toggle::make('home.deals_enabled')->label('Show deals (on-sale products)'),
+                    TextInput::make('home.deals_title')->label('Deals title')->required()->maxLength(40),
+                    Toggle::make('home.featured_enabled')->label('Show featured products'),
+                    TextInput::make('home.featured_title')->label('Featured title')->required()->maxLength(40),
+                    Toggle::make('home.brands_enabled')->label('Show "Shop by brand" strip'),
+                    TextInput::make('home.brands_title')->label('Brands title')->required()->maxLength(40),
+                    Toggle::make('home.new_enabled')->label('Show new arrivals'),
+                    TextInput::make('home.new_title')->label('New arrivals title')->required()->maxLength(40),
+                    TextInput::make('home.block_limit')->label('Products per block')->numeric()->integer()->minValue(1)->maxValue(12)->required(),
                     TextInput::make('home.section_view_all')->label('"View all" link text')->required()->maxLength(30),
                 ]),
         ];

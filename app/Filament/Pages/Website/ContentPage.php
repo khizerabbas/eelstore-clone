@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Website;
 
+use App\Models\AdminActivity;
 use App\Models\SiteContent;
 use App\Support\Content;
 use Closure;
@@ -86,10 +87,27 @@ abstract class ContentPage extends Page
     {
         abort_unless(static::canAccess(), 403);
 
-        $state = $this->form->getState();
+        $state   = $this->form->getState();
+        $changes = [];
 
         foreach (static::$groups as $group) {
-            Content::saveGroup($group, array_map([self::class, 'normalise'], $state[$group] ?? []));
+            $values = array_map([self::class, 'normalise'], $state[$group] ?? []);
+            $before = Content::group($group);
+
+            foreach ($values as $key => $value) {
+                if (($before[$key] ?? null) != $value) {
+                    $changes["{$group}.{$key}"] = [
+                        'old' => is_array($before[$key] ?? null) ? '(list)' : mb_strimwidth((string) ($before[$key] ?? ''), 0, 120, '…'),
+                        'new' => is_array($value) ? '(list)' : mb_strimwidth((string) $value, 0, 120, '…'),
+                    ];
+                }
+            }
+
+            Content::saveGroup($group, $values);
+        }
+
+        if ($changes) {
+            AdminActivity::record('settings', 'Website: ' . static::getNavigationLabel(), changes: $changes);
         }
 
         Notification::make()->title('Saved – the website is updated')->success()->send();
@@ -105,6 +123,8 @@ abstract class ContentPage extends Page
 
         Content::flush();
         $this->fillForm();
+
+        AdminActivity::record('settings', 'Website: ' . static::getNavigationLabel() . ' reset to defaults');
 
         Notification::make()->title('Defaults restored')->success()->send();
     }

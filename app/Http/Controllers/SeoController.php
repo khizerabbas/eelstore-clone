@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Company;
 use App\Models\Page;
 use App\Models\Product;
 use Illuminate\Support\Facades\Cache;
@@ -39,6 +40,9 @@ class SeoController extends Controller
 
             Category::where('is_active', true)->orderBy('sort_order')->get(['slug', 'updated_at'])
                 ->each(fn ($c) => $urls->push(['loc' => route('category.show', $c->slug), 'lastmod' => $c->updated_at, 'priority' => '0.8']));
+
+            Company::where('is_active', true)->whereHas('products', fn ($q) => $q->where('is_active', true))->get(['slug', 'updated_at'])
+                ->each(fn ($b) => $urls->push(['loc' => route('brand.show', $b->slug), 'lastmod' => $b->updated_at, 'priority' => '0.6']));
 
             Product::where('is_active', true)->latest('updated_at')->get(['slug', 'updated_at'])
                 ->each(fn ($p) => $urls->push(['loc' => route('product.show', $p->slug), 'lastmod' => $p->updated_at, 'priority' => '0.7']));

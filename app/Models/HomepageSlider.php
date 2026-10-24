@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Model;
 
 class HomepageSlider extends Model
 {
-    use HasImageVariants;
+    use HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {
@@ -25,6 +26,11 @@ class HomepageSlider extends Model
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    public function activityLabel(): string
+    {
+        return 'Home slide: ' . ($this->title ?: '#' . $this->id);
     }
 
     // Works for uploads on the public disk ("sliders/x.jpg") and legacy paths ("storage/hero/x.jpg")

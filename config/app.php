@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Karachi'), // Pakistan time for orders, admin and emails
 
     /*
     |--------------------------------------------------------------------------

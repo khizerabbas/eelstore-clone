@@ -54,6 +54,15 @@ return [
             ['icon' => 'phone', 'title' => 'Expert Support', 'text' => 'Call or WhatsApp us anytime'],
         ],
         'section_view_all'   => 'View all →',
+        'block_limit'        => 8,               // products per block
+        'deals_enabled'      => true,
+        'deals_title'        => "Today's Deals",
+        'featured_enabled'   => true,
+        'featured_title'     => 'Featured Products',
+        'new_enabled'        => true,
+        'new_title'          => 'New Arrivals',
+        'brands_enabled'     => true,
+        'brands_title'       => 'Shop by Brand',
     ],
 
     'footer' => [

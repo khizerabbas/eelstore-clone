@@ -108,28 +108,38 @@
         </section>
     @endif
 
-    {{-- Category sections (Website → Home sections) --}}
-    @foreach($homepageCategorySections as $section)
-        @php
-            $category = $section->category;
-            $products = $section->products;
-        @endphp
-        @if($category && $products->isNotEmpty())
-            <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-                    <h2 class="text-xl font-semibold">{{ $category->name }}</h2>
-                    <a href="{{ route('category.show', $category->slug) }}" class="text-xs text-accent-ink hover:underline">
-                        {{ content('home.section_view_all') }}
+    {{-- Product blocks (Website → Home page) --}}
+    @include('partials.product-row', ['title' => Content::text('home.deals_title'), 'products' => $deals, 'link' => route('shop.index', ['on_sale' => 1])])
+
+    @include('partials.product-row', ['title' => Content::text('home.featured_title'), 'products' => $featured, 'link' => null])
+
+    {{-- Shop by brand --}}
+    @if($brands->isNotEmpty())
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h2 class="text-xl font-semibold mb-4">{{ Content::text('home.brands_title') }}</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                @foreach($brands as $brand)
+                    <a href="{{ route('brand.show', $brand->slug) }}"
+                       class="bg-white border border-gray-200 rounded-lg h-20 px-3 flex items-center justify-center text-center hover:border-accent hover:shadow-sm transition">
+                        @if($brand->logo)
+                            <x-store-image :src="$brand->imageUrl()" :alt="$brand->name" class="max-h-12 w-auto object-contain"/>
+                        @else
+                            <span class="font-semibold text-slate-700">{{ $brand->name }}</span>
+                        @endif
                     </a>
-                </div>
-                <div class="mb-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-                        @foreach($products as $product)
-                            @include('partials.product-card', ['product' => $product])
-                        @endforeach
-                    </div>
-                </div>
-            </section>
-        @endif
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+    @include('partials.product-row', ['title' => Content::text('home.new_title'), 'products' => $newArrivals, 'link' => route('shop.index', ['sort' => 'latest'])])
+
+    {{-- Category rows (Website → Home sections) --}}
+    @foreach($homepageCategorySections as $section)
+        @include('partials.product-row', [
+            'title'    => $section->category->name,
+            'products' => $section->products,
+            'link'     => route('category.show', $section->category->slug),
+        ])
     @endforeach
 @endsection
