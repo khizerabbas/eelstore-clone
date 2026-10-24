@@ -150,7 +150,10 @@ Cart → /checkout (name*, phone*, email, address, comment)
 > real indexable category pages (`/category/{slug}`, includes sub-categories).
 > **Also done:** brand pages (`/brand/{slug}`), home blocks (Today's deals, Featured, Shop by brand, New arrivals – each switchable),
 > admin activity log (Settings → Activity log), app timezone Asia/Karachi.
-> **Still to do:** wire length estimator, bulk quote form.
+> **Also done:** bulk quote requests (`/bulk-quote`: list + photo/PDF, optional cart items, email + WhatsApp alerts,
+> admin "Quote requests" with statuses), database error log (Settings → Error log: server, jobs, browser, 419/429; grouped,
+> resolvable, clearable, auto-pruned).
+> **Still to do:** wire length estimator (needs the store's real selling units – per coil / per metre).
 
 - Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
 - Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.

@@ -138,6 +138,10 @@
                             {{ \App\Support\Content::text('pages.cart_cod_note') }}
                         </p>
 
+                        <a href="{{ route('quotes.create') }}" class="text-xs text-center text-accent-ink hover:underline">
+                            {{ \App\Support\Content::text('pages.cart_quote_link') }}
+                        </a>
+
                         <form action="{{ route('cart.clear') }}" method="POST">
                             @csrf
                             <button

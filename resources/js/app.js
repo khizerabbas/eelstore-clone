@@ -3,6 +3,74 @@ import noUiSlider from 'nouislider';
 import 'nouislider/dist/nouislider.css';
 import Alpine from 'alpinejs';
 
+// ----- Error reporting → admin Settings → Error log -----
+// Reports are kept in localStorage when the visitor is offline and sent when they're back online.
+const ERROR_ENDPOINT = (document.querySelector('meta[name="error-report-url"]') || {}).content;
+const PENDING_KEY = 'ue_pending_error_reports';
+let reportsThisPage = 0;
+
+const readPending = () => {
+    try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
+};
+const writePending = (items) => {
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(items.slice(-10))); } catch { /* storage full/blocked */ }
+};
+
+const sendReport = (report) => {
+    if (!ERROR_ENDPOINT) return Promise.resolve();
+
+    return fetch(ERROR_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(report),
+        keepalive: true,
+    }).then((response) => {
+        if (!response.ok && response.status !== 429 && response.status !== 422) throw new Error('report failed');
+    });
+};
+
+window.reportClientError = (report) => {
+    if (reportsThisPage++ >= 5) return; // never flood
+
+    const full = { page: window.location.href, level: 'error', ...report };
+
+    if (!navigator.onLine) {
+        writePending([...readPending(), full]);
+        return;
+    }
+
+    sendReport(full).catch(() => writePending([...readPending(), full]));
+};
+
+const flushPending = () => {
+    const pending = readPending();
+    if (!pending.length || !navigator.onLine) return;
+    writePending([]);
+    pending.forEach((report) => sendReport(report).catch(() => {}));
+};
+
+window.addEventListener('online', flushPending);
+flushPending();
+
+window.addEventListener('error', (event) => {
+    if (!(event.error || event.message) || event.target instanceof HTMLElement) return; // resource errors handled elsewhere
+    window.reportClientError({
+        type: event.error?.name || 'JavaScript error',
+        message: String(event.message || event.error),
+        source: event.filename,
+        line: event.lineno,
+        stack: event.error?.stack,
+    });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    window.reportClientError({
+        type: 'Unhandled promise rejection',
+        message: String(event.reason?.message || event.reason || 'Unknown'),
+        stack: event.reason?.stack,
+    });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const menuPanel = document.getElementById('mobile-menu-panel');
@@ -118,7 +186,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error('Network error');
+                window.reportClientError({
+                    type: 'Request failed',
+                    level: response.status === 419 || response.status === 429 ? 'warning' : 'error',
+                    message: `${type} request returned HTTP ${response.status}`,
+                    details: { action, status: response.status, product_id: form.getAttribute('data-product-id') },
+                });
+                showToast(response.status === 419
+                    ? 'Your session expired. Please refresh the page and try again.'
+                    : 'Something went wrong. Please try again.');
+                return;
             }
 
             const data = await response.json();
@@ -192,8 +269,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Wishlist updated');
             }
         } catch (err) {
-            console.error(err);
-            showToast('Something went wrong. Please try again.');
+            // Network down / blocked request
+            window.reportClientError({
+                type: navigator.onLine ? 'Network error' : 'Offline',
+                level: navigator.onLine ? 'error' : 'warning',
+                message: `${type} request could not reach the server: ${err.message}`,
+                details: { action, product_id: form.getAttribute('data-product-id') },
+            });
+            showToast(navigator.onLine
+                ? 'Something went wrong. Please try again.'
+                : 'You are offline. Please check your internet connection.');
         }
     }
 
@@ -283,6 +368,18 @@ document.addEventListener('submit', (event) => {
     const form = event.target;
 
     if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-disable-on-submit')) {
+        return;
+    }
+
+    // Offline: don't send the browser to an error page – tell the visitor and keep the form filled in
+    if (!navigator.onLine) {
+        event.preventDefault();
+        window.reportClientError({
+            type: 'Offline',
+            level: 'warning',
+            message: 'Form submitted while offline: ' + (form.getAttribute('action') || ''),
+        });
+        alert('You seem to be offline. Please check your internet connection and press the button again – your details are still filled in.');
         return;
     }
 

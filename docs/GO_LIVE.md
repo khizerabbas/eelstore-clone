@@ -60,6 +60,8 @@ Set in cPanel → *Select PHP Version → Options* / *MultiPHP INI Editor*, or i
   (cPanel → Domains → Manage → Document Root). **Never** expose the project root (it contains `.env`).
   - If the host can't change the document root: ask support, or move to a host that can – don't put the whole project in `public_html`.
 - [ ] Permissions: `storage/` and `bootstrap/cache/` writable by PHP (`775` folders, `664` files on most hosts).
+- [ ] `storage/app/private/` must exist and be writable – customers' quote list files (photos/PDFs) are stored there
+  privately (never reachable by URL; admins download them through `/admin/quotes/{id}/attachment`).
 
 ### `.htaccess` files (already in the repository – nothing to edit)
 | File | Purpose |
@@ -130,6 +132,10 @@ TURNSTILE_SITE_KEY=                      # optional bot protection on checkout
 TURNSTILE_SECRET_KEY=
 
 ADMIN_REQUIRE_2FA=true                   # every admin must set up an authenticator app
+
+ERROR_LOG_ENABLED=true                   # save errors to the database (Admin → Settings → Error log)
+ERROR_LOG_RETENTION_DAYS=30              # errors not seen for this many days are deleted automatically
+ERROR_LOG_HTTP_STATUSES=419,429          # also record "page expired" and rate limits (add 404 only to debug broken links)
 SEED_ADMIN_EMAIL=                        # leave EMPTY in production
 SEED_ADMIN_PASSWORD=                     # leave EMPTY in production
 ```
@@ -175,6 +181,7 @@ The scheduler starts the queue worker every minute, and daily removes failed job
 - [ ] Log in with the account from `app:create-admin`, **set up 2FA** (Google Authenticator / Microsoft Authenticator) and **save the recovery codes**.
 - [ ] Create a separate **Staff** account for each employee (Settings → Admin users). Never share the Owner login.
 - [ ] Settings → Activity log shows who changed what (Owner only) – check it occasionally.
+- [ ] Settings → **Error log** (Owner only): check it daily for the first week after launch; mark items resolved or clear them.
 - [ ] **Website → Store & contact**: real phone, email, address, opening hours, social links, Google Maps *embed* code, contact-form recipient.
 - [ ] **Website → Branding & theme**: logo, favicon, colours, optional placeholder image.
 - [ ] **Website → Home page / Header & menu / Footer / Page texts / SEO**: review every text; choose which product blocks to show (deals, featured, brands, new arrivals).
@@ -209,6 +216,9 @@ Only relevant if you copy the local database or run the seeders:
   - **WhatsApp alert arrives** on the owner's phone,
   - order appears in Admin → Order requests; "Mark contacted" changes the customer's status page.
 - [ ] Contact form message arrives by email and in Admin → Contact messages.
+- [ ] `/bulk-quote`: send a test quote with a photo attached → admin email (with the file attached) + WhatsApp alert arrive,
+  it shows in Admin → Quote requests and "Download list" works. Delete it afterwards.
+- [ ] Admin → Settings → Error log is reachable and (ideally) empty.
 - [ ] Upload a product image in the admin → it shows on the site (WebP copy created).
 - [ ] `https://YOUR-DOMAIN.pk/admin` requires login + 2FA.
 - [ ] Response headers include `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security` (browser dev tools → Network).
@@ -217,8 +227,9 @@ Only relevant if you copy the local database or run the seeders:
 ## 11. Backups & monitoring
 
 - [ ] Enable the host's daily backups (files **and** database). Keep at least 7 days.
-- [ ] Also back up `storage/app/public/` (uploaded images) and the `.env` file (store it somewhere safe, offline).
-- [ ] Check `storage/logs/laravel.log` weekly for errors (or add an error-monitoring service later).
+- [ ] Also back up `storage/app/public/` (uploaded images), `storage/app/private/` (customers' quote files) and the `.env` file (store it somewhere safe, offline).
+- [ ] Errors are saved in **Admin → Settings → Error log** (server crashes, failed emails/WhatsApp, expired pages, visitors' browser errors).
+  `storage/logs/laravel.log` still has the raw details.
 
 ## 12. Updating the live site later
 
@@ -251,3 +262,6 @@ php artisan up
 | 2026-10-24 | Scheduler runs the queue worker | Cron line (§6); `QUEUE_WORKER_VIA_SCHEDULER` |
 | 2026-10-24 | Admin activity log (`admin_activities` table, pruned after 1 year) | `php artisan migrate --force`; cron line (§6) |
 | 2026-10-24 | Brand pages `/brand/{slug}`, home product blocks | Nothing extra (migrate + optimize as usual) |
+| 2026-10-24 | Error log in the database (server, background jobs, browser, 419/429) | `migrate`; optional `ERROR_LOG_*` in `.env`; cron line prunes old entries |
+| 2026-10-24 | Browser error reports endpoint `POST /client-errors` (CSRF-exempt, rate-limited) | Nothing – must not be blocked by a firewall/WAF rule |
+| 2026-10-24 | Bulk quote requests `/bulk-quote` with photo/PDF upload (private disk) | `migrate`; `storage/app/private` writable + backed up; uploads ≤ 10 MB (php.ini §2 already covers it) |

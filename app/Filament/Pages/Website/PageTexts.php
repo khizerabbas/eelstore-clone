@@ -82,6 +82,18 @@ class PageTexts extends ContentPage
                             ->required()
                             ->maxLength(300))->all()
                     ),
+                    Tab::make('Bulk quotes')->columns(2)->schema([
+                        $text('quote_title', 'Page title', 60),
+                        $long('quote_intro', 'Intro'),
+                        $text('quote_items_label', 'Items box label', 80),
+                        Textarea::make('pages.quote_items_placeholder')->label('Items box example text')->rows(4)->maxLength(400),
+                        $text('quote_attachment_label', 'File upload label'),
+                        $text('quote_include_cart', '"Include my cart" checkbox'),
+                        $text('quote_submit', 'Submit button', 40),
+                        $text('quote_thanks_title', 'Thank-you heading'),
+                        $long('quote_thanks_text', 'Thank-you text'),
+                        $text('cart_quote_link', 'Link on the cart page'),
+                    ]),
                     Tab::make('Contact')->columns(2)->schema([
                         $text('contact_title', 'Contact page title', 40),
                         $long('contact_intro', 'Contact page intro')->helperText(self::placeholdersHint()),

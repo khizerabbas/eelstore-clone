@@ -5,7 +5,10 @@ namespace App\Providers;
 use App\Models\Page;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\ErrorRecorder;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Event;
 use App\Services\WhatsApp\CallMeBotWhatsAppNotifier;
 use App\Services\WhatsApp\CloudApiWhatsAppNotifier;
@@ -41,6 +44,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Background jobs (order emails, WhatsApp alerts) that failed after all retries → Error log
+        Queue::failing(function (JobFailed $event) {
+            $context = ['job' => $event->job->resolveName(), 'attempts' => $event->job->attempts()];
+
+            try {
+                $command = unserialize($event->job->payload()['data']['command'] ?? '');
+                $order = $command->order ?? ($command->mailable->order ?? null);
+                if ($order instanceof \App\Models\Order) {
+                    $context['order'] = $order->reference;
+                }
+            } catch (\Throwable) {
+                // context is a nice-to-have
+            }
+
+            ErrorRecorder::exception($event->exception, 'queue', $context);
+        });
+
         // Record admin logins (shown in the admin users list)
         Event::listen(Login::class, function (Login $event) {
             if ($event->user instanceof User) {

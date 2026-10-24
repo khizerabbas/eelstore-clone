@@ -1,15 +1,18 @@
 <?php
 
 use App\Http\Controllers\Admin\OrderPrintController;
+use App\Http\Controllers\Admin\QuoteAttachmentController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
@@ -49,8 +52,23 @@ Route::get('/admin/orders/{order:id}/print', OrderPrintController::class)
     ->whereNumber('order')
     ->name('admin.orders.print');
 
+// Bulk / trade quote requests
+Route::get('/bulk-quote', [QuoteController::class, 'create'])->name('quotes.create');
+Route::post('/bulk-quote', [QuoteController::class, 'store'])->middleware('throttle:10,1')->name('quotes.store');
+Route::get('/bulk-quote/thank-you', [QuoteController::class, 'thanks'])->name('quotes.thanks');
+
+// Error reports from visitors' browsers (CSRF-exempt so even "page expired" situations get reported)
+Route::post('/client-errors', [ClientErrorController::class, 'store'])
+    ->middleware('throttle:' . config('errorlog.browser_reports_per_minute', 20) . ',1')
+    ->name('client-errors.store');
+
 // CMS pages managed in the admin (Website → Content pages)
 Route::get('/pages/{slug}', [PageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');
+
+Route::get('/admin/quotes/{quote:id}/attachment', QuoteAttachmentController::class)
+    ->middleware('auth')
+    ->whereNumber('quote')
+    ->name('admin.quotes.attachment');
 
 Route::get('/contact-us',[ContactController::class, 'index'])->name('contact.show');
 Route::post('/contact-us', [ContactController::class, 'submit'])->middleware('throttle:10,1')->name('contact.submit');

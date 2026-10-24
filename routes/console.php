@@ -16,6 +16,7 @@ if (config('orders.queue_worker_via_scheduler')) {
         ->withoutOverlapping(5);
 }
 
-// Housekeeping: failed jobs older than 30 days, activity log entries older than a year
+// Housekeeping: failed jobs older than 30 days, activity log entries older than a year,
+// error log entries not seen for ERROR_LOG_RETENTION_DAYS (default 30)
 Schedule::command('queue:prune-failed --hours=720')->daily();
-Schedule::command('model:prune', ['--model' => [\App\Models\AdminActivity::class]])->daily();
+Schedule::command('model:prune', ['--model' => [\App\Models\AdminActivity::class, \App\Models\ErrorLog::class]])->daily();

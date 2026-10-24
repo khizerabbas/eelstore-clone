@@ -72,6 +72,7 @@ return [
             ['label' => 'Home', 'url' => '/'],
             ['label' => 'Shop', 'url' => '/shop'],
             ['label' => 'My Orders', 'url' => '/my-orders'],
+            ['label' => 'Bulk Orders & Quotes', 'url' => '/bulk-quote'],
             ['label' => 'Contact Us', 'url' => '/contact-us'],
         ],
         'categories_heading' => 'Categories',
@@ -124,6 +125,18 @@ return [
         'my_orders_intro'     => 'Order requests you have placed from this browser.',
         'my_orders_empty'     => 'No order requests found in this browser.',
         'my_orders_note'      => 'This list is saved only in this browser. If you clear your cookies it will disappear – your orders are still safe with us, just contact us with your mobile number.',
+
+        // Bulk quote requests (/bulk-quote)
+        'quote_title'         => 'Bulk Orders & Quotes',
+        'quote_intro'         => 'Electrician, contractor or shop? Send us your list and we will WhatsApp or call you with our best trade prices.',
+        'quote_items_label'   => 'What do you need?',
+        'quote_items_placeholder' => "e.g.\n7/29 wire – 5 coils\n2.5 mm wire – 10 coils\nLED bulb 12W – 50 pcs",
+        'quote_attachment_label' => 'Or attach a photo / PDF of your list (optional)',
+        'quote_include_cart'  => 'Also include the items in my cart',
+        'quote_submit'        => 'Request a Quote',
+        'quote_thanks_title'  => 'Thank you! Your quote request was sent.',
+        'quote_thanks_text'   => 'Our team will contact you on WhatsApp or by phone with prices shortly.',
+        'cart_quote_link'     => 'Buying in bulk? Request a trade quote →',
 
         // Contact
         'contact_title'       => 'Contact Us',
