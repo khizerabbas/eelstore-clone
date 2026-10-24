@@ -26,6 +26,11 @@
 
     <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-white border border-gray-100 rounded-lg p-5 sm:p-6">
+            @if($errors->any() && ! $errors->has('form'))
+            <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+            </div>
+            @endif
             @if($errors->has('form'))
                 <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ $errors->first('form') }}</div>
             @endif
@@ -41,13 +46,13 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label for="name" class="{{ $label }}">Your name <span class="text-red-500">*</span></label>
-                        <input id="name" name="name" value="{{ old('name') }}" required maxlength="100" autocomplete="name" class="{{ $input }}">
-                        @error('name')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="name" name="name" value="{{ old('name') }}" required maxlength="100" autocomplete="name" @error('name') aria-invalid="true" aria-describedby="name-error" @enderror class="{{ $input }} @error('name') !border-red-500 bg-red-50/40 @enderror">
+                        @error('name')<p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="phone" class="{{ $label }}">Mobile / WhatsApp number <span class="text-red-500">*</span></label>
-                        <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required maxlength="25" inputmode="tel" autocomplete="tel" placeholder="0300 1234567" class="{{ $input }}">
-                        @error('phone')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required maxlength="25" inputmode="tel" autocomplete="tel" placeholder="0300 1234567" @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror class="{{ $input }} @error('phone') !border-red-500 bg-red-50/40 @enderror">
+                        @error('phone')<p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="business_name" class="{{ $label }}">Business / company name <span class="text-gray-400 font-normal">(optional)</span></label>
@@ -59,23 +64,24 @@
                     </div>
                     <div class="sm:col-span-2">
                         <label for="email" class="{{ $label }}">Email <span class="text-gray-400 font-normal">(optional)</span></label>
-                        <input id="email" type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" class="{{ $input }}">
-                        @error('email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" @error('email') aria-invalid="true" aria-describedby="email-error" @enderror class="{{ $input }} @error('email') !border-red-500 bg-red-50/40 @enderror">
+                        @error('email')<p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>
 
                 <div>
                     <label for="items" class="{{ $label }}">{{ Content::text('pages.quote_items_label') }}</label>
-                    <textarea id="items" name="items" rows="6" maxlength="5000" placeholder="{{ content('pages.quote_items_placeholder') }}" class="{{ $input }}">{{ old('items') }}</textarea>
-                    @error('items')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    <textarea id="items" name="items" rows="6" maxlength="5000" placeholder="{{ content('pages.quote_items_placeholder') }}" @error('items') aria-invalid="true" aria-describedby="items-error" @enderror class="{{ $input }} @error('items') !border-red-500 bg-red-50/40 @enderror">{{ old('items') }}</textarea>
+                    @error('items')<p id="items-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
 
                 <div>
                     <label for="attachment" class="{{ $label }}">{{ Content::text('pages.quote_attachment_label') }}</label>
                     <input id="attachment" type="file" name="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf"
-                           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand file:text-white file:text-sm">
+                           @error('attachment') aria-invalid="true" aria-describedby="attachment-error" @enderror
+                           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand file:text-white file:text-sm @error('attachment') !border-red-500 bg-red-50/40 @enderror">
                     <p class="mt-1 text-[11px] text-gray-500">JPG, PNG, WebP or PDF, up to 10 MB.</p>
-                    @error('attachment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    @error('attachment')<p id="attachment-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
 
                 @if($cartItems->isNotEmpty())
@@ -95,7 +101,7 @@
                 @if(config('orders.turnstile.site_key'))
                     <div>
                         <div class="cf-turnstile" data-sitekey="{{ config('orders.turnstile.site_key') }}"></div>
-                        @error('cf-turnstile-response')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        @error('cf-turnstile-response')<p id="cf-turnstile-response-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 @endif
 

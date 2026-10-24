@@ -98,6 +98,7 @@ APP_NAME="Usman Electronics"
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://YOUR-DOMAIN.pk          # exact live URL, https, no trailing slash
+                                        # (in a subfolder install it must include the folder, e.g. http://localhost/eelstore-clone/public – otherwise uploaded images 404)
 APP_TIMEZONE=Asia/Karachi
 
 LOG_LEVEL=warning
@@ -251,6 +252,8 @@ text and slider rows whose image files don't exist. **Categories and admin users
 - [ ] Response headers also include `Content-Security-Policy`; after clicking around the site and admin,
   Settings → Error log shows **no "CSP violation"** entries.
 - [ ] (If analytics IDs are set) GA4 Realtime / Meta Events Manager shows the visit and the test order as a lead.
+- [ ] On a phone: open a mistyped URL (e.g. `/abc`) → branded "Page not found" page with search; submit checkout with a
+  wrong phone number → the page jumps to the red, highlighted field.
 - [ ] Remove the test orders/quotes: `php artisan app:launch-cleanup` (choose only those sections).
 
 ## 11. Backups & monitoring
@@ -306,3 +309,4 @@ php artisan up
 | 2026-10-24 | Content-Security-Policy + `POST /csp-report` | `CSP_ENABLED`, `CSP_REPORT_ONLY`; endpoint must not be blocked by a firewall |
 | 2026-10-24 | Nightly backups (spatie/laravel-backup 9) + Admin → Settings → Backups | `mysqldump`; `BACKUP_*`, `DB_DUMP_BINARY_PATH`; cron line; `php artisan backup:run` once |
 | 2026-10-24 | Optional GA4 / Meta Pixel (Website → SEO) | Nothing on the server; add IDs in the admin when ready |
+| 2026-10-25 | Storefront UX pass: mobile header/cart/checkout, filter chips, image viewer, branded 404/419/429/500/503 pages; contact form takes phone **or** email | `migrate` (contact_messages.email nullable); `npm run build` |

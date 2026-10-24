@@ -1,150 +1,71 @@
 @php
-    $wishlistSession = session('wishlist', []);
-    $isInWishlist = is_array($wishlistSession) && in_array($product->id, $wishlistSession);
+    use App\Support\Content;
 
-    // control whether the heart icon should show (default: true)
+    $wishlistSession  = session('wishlist', []);
+    $isInWishlist     = is_array($wishlistSession) && in_array($product->id, $wishlistSession);
     $showWishlistIcon = $showWishlistIcon ?? true;
+    $productUrl       = route('product.show', $product->slug);
+    $discount         = $product->discountPercent();
 @endphp
 
-<div class="group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden
-            transition-all hover:shadow-md hover:-translate-y-1 flex flex-col h-full">
-
-    {{-- Top bar: SALE + wishlist --}}
-    <div class="absolute inset-x-0 top-0 z-10 flex items-start justify-between px-2 pt-2 pointer-events-none">
-        <div>
-            @if($product->is_on_sale)
-                <span class="inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-auto">
-                    {{ \App\Support\Content::text('pages.sale_badge') }}
-                </span>
-            @endif
-        </div>
-
-        @if($showWishlistIcon)
-            <div class="pointer-events-auto">
-                <form
-                    action="{{ route('wishlist.add', $product) }}"
-                    method="POST"
-                    data-ajax="wishlist"
-                    data-product-id="{{ $product->id }}"
-                >
-                    @csrf
-                    <button
-                        type="submit"
-                        class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center text-xs hover:text-red-500 transition"
-                        aria-label="Add to wishlist"
-                    >
-                        @if($isInWishlist)
-                            <span class="wishlist-heart text-red-500">❤</span>
-                        @else
-                            <span class="wishlist-heart text-gray-400">♡</span>
-                        @endif
-                    </button>
-                </form>
-            </div>
-        @endif
-    </div>
-
-    {{-- Product image / placeholder --}}
-    <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-       class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center overflow-hidden">
-        <x-store-image :src="$product->imageUrl()" :alt="$product->name" class="w-full h-full object-contain"/>
-    </a>
-
-    {{-- Text content --}}
-    <div class="flex-1 p-4 pb-4 md:pb-10 flex flex-col space-y-2">
-        {{-- Company row – fixed min height so cards align even if no company --}}
-        <span class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold min-h-[1rem] block">
-            {{ optional($product->company)->name }}
+{{-- Product card: compact on phones (2 per row), always-visible "Add to cart" (works on touch screens) --}}
+<div class="group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full transition hover:shadow-md">
+    @if($discount)
+        <span class="absolute left-2 top-2 z-10 inline-flex items-center gap-1 bg-red-500 text-white text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full">
+            {{ Content::text('pages.sale_badge') }} −{{ $discount }}%
         </span>
+    @endif
 
-        {{-- Title --}}
-        <h3 class="text-sm font-semibold text-gray-800 leading-snug">
-            <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-               class="hover:text-slate-900">
-                {{ $product->name }}
-            </a>
-        </h3>
-
-        {{-- Price --}}
-        <div class="flex items-baseline gap-2">
-            @if($product->is_on_sale && $product->sale_price)
-                <span class="text-red-600 font-bold text-sm">
-                    Rs {{ number_format($product->sale_price, 0) }}
-                </span>
-                <span class="text-gray-400 line-through text-xs">
-                    Rs {{ number_format($product->price, 0) }}
-                </span>
-            @else
-                <span class="text-slate-900 font-bold text-sm">
-                    Rs {{ number_format($product->price, 0) }}
-                </span>
-            @endif
-        </div>
-
-        {{-- Short description – allowed to grow, but we still keep the CTA at the bottom --}}
-        @if($product->short_description)
-            <p class="text-xs text-gray-500">
-                {{ $product->short_description }}
-            </p>
-        @endif
-
-        {{-- This pushes everything above up and leaves space for the bottom action bar --}}
-        <div class="mt-auto"></div>
-    </div>
-
-    {{-- Desktop: hover action bar --}}
-    <div class="hidden md:flex absolute inset-x-0 bottom-0 bg-white border-t border-gray-200 px-3 py-2
-                items-center justify-between opacity-0 translate-y-3
-                group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-150">
-
-        {{-- Add to Cart --}}
-        <form
-            action="{{ route('cart.add', $product) }}"
-            method="POST"
-            data-ajax="cart"
-            data-product-id="{{ $product->id }}"
-        >
+    @if($showWishlistIcon)
+        <form action="{{ route('wishlist.add', $product) }}" method="POST" data-ajax="wishlist" data-product-id="{{ $product->id }}"
+              class="absolute right-2 top-2 z-10">
             @csrf
-            <input type="hidden" name="quantity" value="1">
-            <button
-                type="submit"
-                class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
-            >
-                🛒 <span>{{ \App\Support\Content::text('pages.add_to_cart') }}</span>
+            <button type="submit" aria-label="{{ $isInWishlist ? 'Remove from wishlist' : 'Add to wishlist' }}"
+                    class="w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center text-sm hover:text-red-500 transition">
+                @if($isInWishlist)
+                    <span class="wishlist-heart text-red-500">❤</span>
+                @else
+                    <span class="wishlist-heart text-gray-400">♡</span>
+                @endif
             </button>
         </form>
+    @endif
 
-        {{-- View Details --}}
-        <a
-            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-            class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
-        >
-            👁️ <span>Details</span>
-        </a>
-    </div>
+    <a href="{{ $productUrl }}" class="block aspect-square bg-white p-2 sm:p-3" tabindex="-1" aria-hidden="true">
+        <x-store-image :src="$product->imageUrl()" :alt="$product->name"
+                       class="w-full h-full object-contain transition duration-300 group-hover:scale-105"/>
+    </a>
 
-    {{-- Mobile: full-width buttons --}}
-    <div class="md:hidden px-4 pb-4 space-y-2">
-        <a
-            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-            class="block w-full text-center text-xs font-semibold rounded-md bg-brand text-white py-2 hover:bg-brand/90"
-        >
-            View Details
-        </a>
+    <div class="flex-1 flex flex-col gap-1 px-3 pb-3 sm:px-4 sm:pb-4">
+        {{-- Brand line always takes its space so names line up across cards --}}
+        <span class="text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-500 font-semibold truncate min-h-[1.25em]">
+            {{ $product->company?->name }}
+        </span>
 
-        <form
-            action="{{ route('cart.add', $product) }}"
-            method="POST"
-            data-ajax="cart"
-            data-product-id="{{ $product->id }}"
-        >
+        <h3 class="text-[13px] sm:text-sm font-semibold text-gray-800 leading-snug line-clamp-2 min-h-[2.5em]">
+            <a href="{{ $productUrl }}" class="hover:text-accent-ink">{{ $product->name }}</a>
+        </h3>
+
+        <div class="flex flex-wrap items-baseline gap-x-2">
+            @if($product->isOnSale())
+                <span class="text-red-600 font-bold text-sm sm:text-base">{{ rupees($product->sale_price) }}</span>
+                <span class="text-gray-400 line-through text-[11px] sm:text-xs">{{ rupees($product->price) }}</span>
+            @else
+                <span class="text-slate-900 font-bold text-sm sm:text-base">{{ rupees($product->price) }}</span>
+            @endif
+        </div>
+
+        @if($product->short_description)
+            <p class="hidden sm:block text-xs text-gray-500 line-clamp-2">{{ $product->short_description }}</p>
+        @endif
+
+        <form action="{{ route('cart.add', $product) }}" method="POST" data-ajax="cart" data-product-id="{{ $product->id }}" class="mt-auto pt-2">
             @csrf
             <input type="hidden" name="quantity" value="1">
-            <button
-                type="submit"
-                class="w-full text-center text-xs font-semibold rounded-md border border-brand text-brand py-2 hover:bg-brand hover:text-white"
-            >
-                {{ \App\Support\Content::text('pages.add_to_cart') }}
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-brand text-white text-xs sm:text-sm font-semibold py-2 hover:bg-brand/90 transition">
+                <x-store-icon name="cart" class="w-4 h-4"/>
+                <span>{{ Content::text('pages.add_to_cart') }}</span>
             </button>
         </form>
     </div>

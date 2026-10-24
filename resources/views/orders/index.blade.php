@@ -42,7 +42,7 @@
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <span class="text-sm font-semibold">Rs {{ number_format((float) $order->subtotal) }}</span>
+                                    <span class="text-sm font-semibold">{{ rupees((float) $order->subtotal) }}</span>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $order->status->badgeClasses() }}">
                                         {{ $order->status->label() }}
                                     </span>

@@ -111,8 +111,11 @@ class ProductController extends Controller
         // else: no category/company filter
 
         // ---- Other filters ----
+        // Same rule as Product::isOnSale(): a real discount, not just the "on sale" tick
         if ($onSale) {
-            $query->where('is_on_sale', true);
+            $query->where('is_on_sale', true)
+                ->where('sale_price', '>', 0)
+                ->whereColumn('sale_price', '<', 'price');
         }
 
         // CAST the bounds: SQLite binds PHP floats as text, which never compares equal/between numbers
@@ -143,6 +146,11 @@ class ProductController extends Controller
         $products = $query
             ->paginate($perPage)
             ->withQueryString();
+
+        // Page number past the end (old link, fewer products now) → last real page instead of an empty grid
+        if ($products->isEmpty() && $products->currentPage() > 1 && $products->total() > 0) {
+            return $this->redirectToPage($request, $products->lastPage());
+        }
 
         // ---- Sidebar data: categories with counts ----
         $categories = Category::where('is_active', true)
@@ -226,6 +234,11 @@ class ProductController extends Controller
         $queryText   = trim($request->input('q', ''));
         $categoryId  = $request->input('category');
 
+        // Category picked but no words typed → that category's page
+        if ($queryText === '' && $categoryId && ($category = Category::where('is_active', true)->find($categoryId))) {
+            return redirect()->route('category.show', $category->slug);
+        }
+
         $products = collect();
 
         if ($queryText !== '' || $categoryId) {
@@ -246,12 +259,25 @@ class ProductController extends Controller
             $products = $productsQuery
                 ->paginate(12)
                 ->withQueryString();
+
+            if ($products->isEmpty() && $products->currentPage() > 1 && $products->total() > 0) {
+                return $this->redirectToPage($request, $products->lastPage());
+            }
         }
 
         return view('search.results', [
-            'query'    => $queryText,
-            'products' => $products,
+            'query'      => $queryText,
+            'products'   => $products,
+            'categories' => Category::where('is_active', true)->whereNull('parent_id')->orderBy('sort_order')->orderBy('name')->get(['name', 'slug']),
         ]);
     }
 
+    // Same URL with another page number. Built from the raw query string because category/brand pages
+    // add their own filter to the request, which shouldn't show up in the address bar.
+    private function redirectToPage(Request $request, int $page)
+    {
+        parse_str((string) $request->getQueryString(), $query);
+
+        return redirect()->to($request->url() . '?' . http_build_query(array_merge($query, ['page' => $page])));
+    }
 }

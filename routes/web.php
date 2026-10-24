@@ -83,3 +83,6 @@ Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.in
 Route::post('/wishlist/add/{product}', [WishlistController::class, 'add'])->middleware('throttle:60,1')->name('wishlist.add');
 Route::post('/wishlist/remove/{product}', [WishlistController::class, 'remove'])->middleware('throttle:60,1')->name('wishlist.remove');
 Route::post('/wishlist/clear', [WishlistController::class, 'clear'])->middleware('throttle:60,1')->name('wishlist.clear');
+
+// Unknown URLs: answer 404 through the web middleware so the error page still sees the visitor's cart and wishlist
+Route::fallback(fn () => abort(404));

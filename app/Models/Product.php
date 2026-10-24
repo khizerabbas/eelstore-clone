@@ -107,6 +107,18 @@ class Product extends Model
             ->all();
     }
 
+    // On sale = flagged AND has a sale price (same rule as getDisplayPrice())
+    public function isOnSale(): bool
+    {
+        return $this->is_on_sale && (float) $this->sale_price > 0 && (float) $this->sale_price < (float) $this->price;
+    }
+
+    // "12" for a 12% discount, null when not on sale
+    public function discountPercent(): ?int
+    {
+        return $this->isOnSale() ? (int) round((1 - (float) $this->sale_price / (float) $this->price) * 100) : null;
+    }
+
     // SQL version of getDisplayPrice() for whereBetween / orderBy / min / max
     public static function effectivePriceSql(): string
     {
