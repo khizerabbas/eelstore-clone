@@ -2,9 +2,11 @@
 
 namespace App\Support;
 
+use App\Mail\ErrorAlert;
 use App\Models\ErrorLog;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -90,25 +92,52 @@ class ErrorRecorder
             $existing = ErrorLog::where('fingerprint', $fingerprint)->first();
 
             if ($existing) {
+                $wasResolved = $existing->resolved_at !== null;
+
                 // Same error again: bump the counter, keep the latest details, reopen if it was resolved
                 $existing->forceFill(Arr::only($data, ['url', 'method', 'context', 'user_id', 'ip_address', 'user_agent', 'trace']) + [
                     'occurrences'  => $existing->occurrences + 1,
                     'last_seen_at' => $now,
                     'resolved_at'  => null,
                 ])->saveQuietly();
+
+                if ($wasResolved) {
+                    self::maybeAlert($existing, reopened: true);
+                }
             } else {
-                ErrorLog::forceCreate($data + [
+                $log = ErrorLog::forceCreate($data + [
                     'fingerprint'   => $fingerprint,
                     'occurrences'   => 1,
                     'first_seen_at' => $now,
                     'last_seen_at'  => $now,
                 ]);
+
+                self::maybeAlert($log);
             }
         } catch (Throwable) {
             // e.g. database down – the normal laravel.log still has the error
         } finally {
             self::$recording = false;
         }
+    }
+
+    // Email the owner about new (or returning) real errors – limited per hour, never about its own failures
+    private static function maybeAlert(ErrorLog $log, bool $reopened = false): void
+    {
+        $to = config('errorlog.alert_email') ?: config('orders.admin_email');
+
+        if (! $to || ! config('errorlog.alerts_enabled') || $log->level !== 'error'
+            || ! in_array($log->source, config('errorlog.alert_sources', []), true)
+            || str_contains((string) ($log->context['job'] ?? ''), 'ErrorAlert')) {
+            return;
+        }
+
+        if (RateLimiter::tooManyAttempts('error-alert-emails', (int) config('errorlog.alerts_per_hour', 10))) {
+            return;
+        }
+
+        RateLimiter::hit('error-alert-emails', 3600);
+        Mail::to($to)->queue(new ErrorAlert($log, $reopened));
     }
 
     // A real web request (the test runner also counts as "console", so check both)

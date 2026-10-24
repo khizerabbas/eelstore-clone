@@ -150,6 +150,60 @@ class ErrorLogTest extends TestCase
         $this->assertSame(0, ErrorLog::count());
     }
 
+    public function test_owner_is_emailed_once_per_new_error(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        config(['orders.admin_email' => 'owner@example.com']);
+
+        $this->post('/_test/boom');
+        $this->post('/_test/boom'); // same error again – no second email
+
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\ErrorAlert::class, 1);
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\ErrorAlert::class, fn ($mail) => $mail->hasTo('owner@example.com') && ! $mail->reopened);
+
+        // Resolved, then it comes back → "Error is back" email
+        ErrorLog::query()->update(['resolved_at' => now()]);
+        $this->post('/_test/boom');
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\ErrorAlert::class, fn ($mail) => $mail->reopened);
+    }
+
+    public function test_warnings_and_browser_errors_do_not_send_emails(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        config(['orders.admin_email' => 'owner@example.com']);
+
+        $this->get('/_test/expired');
+        $this->postJson(route('client-errors.store'), ['message' => 'Cannot read properties of undefined']);
+
+        \Illuminate\Support\Facades\Mail::assertNothingQueued();
+    }
+
+    public function test_alert_emails_are_limited_per_hour(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        config(['orders.admin_email' => 'owner@example.com', 'errorlog.alerts_per_hour' => 3]);
+
+        for ($i = 1; $i <= 5; $i++) {
+            \App\Support\ErrorRecorder::exception(new RuntimeException("Different error {$i}"));
+        }
+
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\ErrorAlert::class, 3);
+        $this->assertSame(5, ErrorLog::count()); // all still logged
+    }
+
+    public function test_no_alert_without_an_email_address_or_for_failed_alerts(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        config(['orders.admin_email' => null, 'errorlog.alert_email' => null]);
+        $this->post('/_test/boom');
+        \Illuminate\Support\Facades\Mail::assertNothingQueued();
+
+        // A failing alert email must not trigger another alert (no loop)
+        config(['orders.admin_email' => 'owner@example.com']);
+        \App\Support\ErrorRecorder::exception(new RuntimeException('SMTP down'), 'queue', ['job' => \App\Mail\ErrorAlert::class]);
+        \Illuminate\Support\Facades\Mail::assertNothingQueued();
+    }
+
     public function test_old_errors_are_pruned(): void
     {
         $this->post('/_test/boom');
