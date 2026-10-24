@@ -5397,6 +5397,19 @@ class SiteSetting extends Model
         return str_starts_with($value, 'https://www.google.com/maps/embed') ? $value : null;
     }
 
+    // What the "Google Maps" setting stores: an embed URL (shown as a map on the contact page) or a normal
+    // Google Maps share link (shown as an "Open in Google Maps" button). Anything else → null.
+    public static function normalizeMapSetting(?string $value): ?string
+    {
+        if ($embed = static::extractMapSrc($value)) {
+            return $embed;
+        }
+
+        $value = trim((string) $value);
+
+        return preg_match('#^https://(maps\.app\.goo\.gl|goo\.gl/maps|(www\.)?google\.[a-z.]+/maps)(/|\?|$)#i', $value) ? $value : null;
+    }
+
     // Store name from settings (admin-editable), falling back to APP_NAME
     public static function storeName(): string
     {
