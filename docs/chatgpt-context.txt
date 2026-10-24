@@ -2,14 +2,18 @@
 <?php
 
 use App\Http\Controllers\Admin\OrderPrintController;
+use App\Http\Controllers\Admin\QuoteAttachmentController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +25,7 @@ Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 
 Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('category.show');
+Route::get('/brand/{slug}', [BrandController::class, 'show'])->name('brand.show');
 
 Route::get('/product/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/search', [ProductController::class, 'search'])->name('search');
@@ -48,8 +53,23 @@ Route::get('/admin/orders/{order:id}/print', OrderPrintController::class)
     ->whereNumber('order')
     ->name('admin.orders.print');
 
+// Bulk / trade quote requests
+Route::get('/bulk-quote', [QuoteController::class, 'create'])->name('quotes.create');
+Route::post('/bulk-quote', [QuoteController::class, 'store'])->middleware('throttle:10,1')->name('quotes.store');
+Route::get('/bulk-quote/thank-you', [QuoteController::class, 'thanks'])->name('quotes.thanks');
+
+// Error reports from visitors' browsers (CSRF-exempt so even "page expired" situations get reported)
+Route::post('/client-errors', [ClientErrorController::class, 'store'])
+    ->middleware('throttle:' . config('errorlog.browser_reports_per_minute', 20) . ',1')
+    ->name('client-errors.store');
+
 // CMS pages managed in the admin (Website → Content pages)
 Route::get('/pages/{slug}', [PageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');
+
+Route::get('/admin/quotes/{quote:id}/attachment', QuoteAttachmentController::class)
+    ->middleware('auth')
+    ->whereNumber('quote')
+    ->name('admin.quotes.attachment');
 
 Route::get('/contact-us',[ContactController::class, 'index'])->name('contact.show');
 Route::post('/contact-us', [ContactController::class, 'submit'])->middleware('throttle:10,1')->name('contact.submit');
@@ -88,6 +108,62 @@ class OrderPrintController extends Controller
                 'settings' => SiteSetting::current(),
             ])
             ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+}
+
+
+--- FILE: app/Http/Controllers/Admin/QuoteAttachmentController.php ---
+
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\QuoteRequest;
+use Filament\Facades\Filament;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+// Download a customer's uploaded list (private disk) – admins only
+class QuoteAttachmentController extends Controller
+{
+    public function __invoke(Request $request, QuoteRequest $quote)
+    {
+        abort_unless($request->user()?->canAccessPanel(Filament::getPanel('admin')) && $request->user()->can('view', $quote), 403);
+        abort_unless($quote->attachment_path && Storage::disk(QuoteRequest::ATTACHMENT_DISK)->exists($quote->attachment_path), 404);
+
+        return Storage::disk(QuoteRequest::ATTACHMENT_DISK)->download(
+            $quote->attachment_path,
+            $quote->attachment_name ?: basename($quote->attachment_path),
+            ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "default-src 'none'"]
+        );
+    }
+}
+
+
+--- FILE: app/Http/Controllers/BrandController.php ---
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Company;
+use Illuminate\Http\Request;
+
+// Indexable brand pages (/brand/{slug}): the shop listing pre-filtered to one brand ("company" in the database)
+class BrandController extends Controller
+{
+    public function show(Request $request, string $slug)
+    {
+        $brand = Company::where('slug', $slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        if (! $request->has('companies')) {
+            $request->merge(['companies' => [$brand->id]]);
+        }
+
+        return app(ProductController::class)->index($request, currentBrand: $brand);
     }
 }
 
@@ -265,6 +341,43 @@ class CheckoutController extends Controller
 }
 
 
+--- FILE: app/Http/Controllers/ClientErrorController.php ---
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Support\ErrorRecorder;
+use Illuminate\Http\Request;
+
+// Receives error reports from visitors' browsers (resources/js/app.js) → Error log
+class ClientErrorController extends Controller
+{
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'type'    => ['nullable', 'string', 'max:100'],
+            'level'   => ['nullable', 'in:error,warning'],
+            'message' => ['required', 'string', 'max:2000'],
+            'source'  => ['nullable', 'string', 'max:500'],
+            'line'    => ['nullable', 'integer', 'min:0'],
+            'stack'   => ['nullable', 'string', 'max:8000'],
+            'page'    => ['nullable', 'string', 'max:2000'],
+            'details' => ['nullable', 'array', 'max:20'],
+        ]);
+
+        // Browser noise we can't act on (extensions, cross-origin scripts)
+        if (preg_match('/^(Script error\.?|ResizeObserver loop)/i', $data['message'])) {
+            return response()->noContent();
+        }
+
+        ErrorRecorder::browser($data);
+
+        return response()->noContent();
+    }
+}
+
+
 --- FILE: app/Http/Controllers/ContactController.php ---
 
 <?php
@@ -363,39 +476,61 @@ abstract class Controller
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
+use App\Models\HomepageCategorySection;
 use App\Models\HomepageSlider;
 use App\Models\Product;
-use App\Models\HomepageCategorySection;
+
 class HomeController extends Controller
 {
     public function index()
     {
-
         $heroSliders = HomepageSlider::where('is_active', true)
             ->orderBy('sort_order')
             ->limit(3)
             ->get();
 
-        // Load up to 3 homepage category sections, with categories
+        $limit  = max(1, min(12, (int) content('home.block_limit', 8)));
+        $active = fn () => Product::with('company')->where('is_active', true);
+
+        // Product blocks (Website → Home page): each can be switched off
+        $deals = content('home.deals_enabled')
+            ? $active()->where('is_on_sale', true)->where('sale_price', '>', 0)->latest('updated_at')->take($limit)->get()
+            : collect();
+
+        $featured = content('home.featured_enabled')
+            ? $active()->where('is_featured', true)->latest('updated_at')->take($limit)->get()
+            : collect();
+
+        $newArrivals = content('home.new_enabled')
+            ? $active()->latest()->take($limit)->get()
+            : collect();
+
+        $brands = content('home.brands_enabled')
+            ? Company::where('is_active', true)
+                ->whereHas('products', fn ($q) => $q->where('is_active', true))
+                ->orderBy('name')
+                ->get()
+            : collect();
+
+        // Category rows (Website → Home sections)
         $homepageCategorySections = HomepageCategorySection::with('category')
             ->where('is_active', true)
             ->orderBy('position')
             ->get()
-            // hide sections where no category is selected
             ->filter(fn ($section) => $section->category !== null)
             ->values();
 
-        // Attach products for each section/category
         $homepageCategorySections->each(function ($section) {
-            $section->products = Product::query()
+            $section->products = Product::with('company')
                 ->where('is_active', true)
-                ->where('category_id', $section->category_id) // adjust if you use a pivot/other relation
+                ->where('category_id', $section->category_id)
                 ->latest()
                 ->take(8)
                 ->get();
         });
 
-        return view('home', compact('heroSliders', 'homepageCategorySections'));
+        return view('home', compact('heroSliders', 'deals', 'featured', 'newArrivals', 'brands', 'homepageCategorySections'));
     }
 }
 
@@ -511,7 +646,7 @@ use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
-    public function index(Request $request, ?Category $currentCategory = null)
+    public function index(Request $request, ?Category $currentCategory = null, ?Company $currentBrand = null)
     {
         // ---- Global price range (for slider/inputs) ----
         $minPriceRaw = Product::where('is_active', true)
@@ -685,6 +820,7 @@ class ProductController extends Controller
 
         return view('shop.index', [
             'currentCategory'    => $currentCategory,
+            'currentBrand'       => $currentBrand,
             'products'           => $products,
             'categories'         => $categories,
             'categoryCompanies'  => $categoryCompanies,
@@ -758,6 +894,116 @@ class ProductController extends Controller
 }
 
 
+--- FILE: app/Http/Controllers/QuoteController.php ---
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\QuoteRequestForm;
+use App\Jobs\SendQuoteWhatsAppAlert;
+use App\Mail\NewQuoteRequest;
+use App\Models\QuoteRequest;
+use App\Models\SiteSetting;
+use App\Support\Cart;
+use App\Support\PakistaniPhone;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Throwable;
+
+// Bulk / trade quote requests (/bulk-quote) – same notifications as orders (email + owner WhatsApp)
+class QuoteController extends Controller
+{
+    public function create()
+    {
+        $cartItems = Cart::items();
+
+        return view('quotes.create', [
+            'cartItems' => $cartItems,
+            'cartTotal' => $cartItems->sum('cart_subtotal'),
+        ]);
+    }
+
+    public function store(QuoteRequestForm $request)
+    {
+        // Honeypot: pretend it worked, store nothing
+        if ($request->filled('website')) {
+            return redirect()->route('quotes.thanks');
+        }
+
+        $phone    = PakistaniPhone::normalize($request->validated('phone'));
+        $ipKey    = 'quote:ip:' . $request->ip();
+        $phoneKey = 'quote:phone:' . $phone;
+
+        if (RateLimiter::tooManyAttempts($ipKey, 5) || RateLimiter::tooManyAttempts($phoneKey, 3)) {
+            return back()
+                ->withErrors(['form' => 'You have sent several requests recently. Please wait a while, or call/WhatsApp us directly.'])
+                ->withInput();
+        }
+
+        $attachmentPath = $attachmentName = null;
+        if ($file = $request->file('attachment')) {
+            // Random name on the private disk – never served directly
+            $attachmentPath = $file->storeAs('quotes', Str::random(40) . '.' . $file->guessExtension(), QuoteRequest::ATTACHMENT_DISK);
+            $attachmentName = Str::limit(preg_replace('/[^\w.\- ]+/', '_', $file->getClientOriginalName()), 120, '');
+        }
+
+        $cartItems = $request->boolean('include_cart')
+            ? Cart::items()->map(fn ($p) => [
+                'product_id'   => $p->id,
+                'product_name' => $p->name,
+                'sku'          => $p->sku,
+                'quantity'     => $p->cart_quantity,
+                'unit_price'   => $p->cart_price,
+                'line_total'   => $p->cart_subtotal,
+            ])->values()->all()
+            : null;
+
+        $quote = QuoteRequest::create([
+            'name'            => $request->validated('name'),
+            'phone'           => $phone,
+            'email'           => $request->validated('email'),
+            'business_name'   => $request->validated('business_name'),
+            'city'            => $request->validated('city'),
+            'items'           => (string) $request->validated('items'),
+            'cart_items'      => $cartItems ?: null,
+            'attachment_path' => $attachmentPath,
+            'attachment_name' => $attachmentName,
+            'ip_address'      => $request->ip(),
+            'user_agent'      => Str::limit((string) $request->userAgent(), 1000, ''),
+        ]);
+
+        RateLimiter::hit($ipKey, 3600);
+        RateLimiter::hit($phoneKey, 3600);
+
+        // A notification problem must never fail the customer's request (failures land in the Error log)
+        $notify = function (callable $send) {
+            try {
+                $send();
+            } catch (Throwable $e) {
+                report($e);
+            }
+        };
+
+        $adminEmail = config('orders.admin_email') ?: SiteSetting::current()->contact_recipient_email;
+        if ($adminEmail) {
+            $notify(fn () => Mail::to($adminEmail)->queue(new NewQuoteRequest($quote)));
+        }
+        $notify(fn () => SendQuoteWhatsAppAlert::dispatch($quote));
+
+        return redirect()->route('quotes.thanks')->with('quote_reference', $quote->reference);
+    }
+
+    public function thanks()
+    {
+        return response()
+            ->view('quotes.thanks', ['reference' => session('quote_reference')])
+            ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+}
+
+
 --- FILE: app/Http/Controllers/SeoController.php ---
 
 <?php
@@ -765,6 +1011,7 @@ class ProductController extends Controller
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Company;
 use App\Models\Page;
 use App\Models\Product;
 use Illuminate\Support\Facades\Cache;
@@ -801,6 +1048,9 @@ class SeoController extends Controller
 
             Category::where('is_active', true)->orderBy('sort_order')->get(['slug', 'updated_at'])
                 ->each(fn ($c) => $urls->push(['loc' => route('category.show', $c->slug), 'lastmod' => $c->updated_at, 'priority' => '0.8']));
+
+            Company::where('is_active', true)->whereHas('products', fn ($q) => $q->where('is_active', true))->get(['slug', 'updated_at'])
+                ->each(fn ($b) => $urls->push(['loc' => route('brand.show', $b->slug), 'lastmod' => $b->updated_at, 'priority' => '0.6']));
 
             Product::where('is_active', true)->latest('updated_at')->get(['slug', 'updated_at'])
                 ->each(fn ($p) => $urls->push(['loc' => route('product.show', $p->slug), 'lastmod' => $p->updated_at, 'priority' => '0.7']));
@@ -1132,6 +1382,10 @@ class WishlistController extends Controller
                         <p class="text-[11px] text-gray-500 text-center">
                             {{ \App\Support\Content::text('pages.cart_cod_note') }}
                         </p>
+
+                        <a href="{{ route('quotes.create') }}" class="text-xs text-center text-accent-ink hover:underline">
+                            {{ \App\Support\Content::text('pages.cart_quote_link') }}
+                        </a>
 
                         <form action="{{ route('cart.clear') }}" method="POST">
                             @csrf
@@ -1792,6 +2046,58 @@ Thanks,<br>
 </x-mail::message>
 
 
+--- FILE: resources/views/emails/quotes/admin-new-request.blade.php ---
+
+<x-mail::message>
+# Bulk quote request {{ $quote->reference }}
+
+Someone asked **{{ $storeName }}** for a quote. Please call or WhatsApp them with prices.
+
+**Name:** {{ $quote->name }}<br>
+**Phone:** {{ $quote->displayPhone() }}<br>
+@if($quote->business_name)
+**Business:** {{ $quote->business_name }}<br>
+@endif
+@if($quote->city)
+**City / area:** {{ $quote->city }}<br>
+@endif
+@if($quote->email)
+**Email:** {{ $quote->email }}<br>
+@endif
+**Received:** {{ $quote->created_at->format('d M Y, h:i A') }}
+
+<x-mail::button :url="$quote->whatsappUrl('Assalam o Alaikum ' . $quote->name . ', this is ' . $storeName . ' about your quote request ' . $quote->reference . '.')" color="success">
+WhatsApp {{ $quote->name }}
+</x-mail::button>
+
+Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
+
+@if($quote->items)
+**Items requested:**
+
+<x-mail::panel>
+{!! nl2br(e($quote->items)) !!}
+</x-mail::panel>
+@endif
+
+@if($quote->cart_items)
+**Items from their cart:**
+
+<x-mail::table>
+| Product | Qty | Current price |
+|:--------|:---:|--------------:|
+@foreach($quote->cart_items as $item)
+| {{ str_replace('|', '/', $item['product_name']) }} | {{ $item['quantity'] }} | Rs {{ number_format((float) $item['line_total']) }} |
+@endforeach
+</x-mail::table>
+@endif
+
+@if($quote->attachment_path)
+📎 The customer attached their list: **{{ $quote->attachment_name }}** (attached to this email).
+@endif
+</x-mail::message>
+
+
 --- FILE: resources/views/home.blade.php ---
 
 @extends('layouts.frontend')
@@ -1904,29 +2210,39 @@ Thanks,<br>
         </section>
     @endif
 
-    {{-- Category sections (Website → Home sections) --}}
-    @foreach($homepageCategorySections as $section)
-        @php
-            $category = $section->category;
-            $products = $section->products;
-        @endphp
-        @if($category && $products->isNotEmpty())
-            <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-                    <h2 class="text-xl font-semibold">{{ $category->name }}</h2>
-                    <a href="{{ route('category.show', $category->slug) }}" class="text-xs text-accent-ink hover:underline">
-                        {{ content('home.section_view_all') }}
+    {{-- Product blocks (Website → Home page) --}}
+    @include('partials.product-row', ['title' => Content::text('home.deals_title'), 'products' => $deals, 'link' => route('shop.index', ['on_sale' => 1])])
+
+    @include('partials.product-row', ['title' => Content::text('home.featured_title'), 'products' => $featured, 'link' => null])
+
+    {{-- Shop by brand --}}
+    @if($brands->isNotEmpty())
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h2 class="text-xl font-semibold mb-4">{{ Content::text('home.brands_title') }}</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                @foreach($brands as $brand)
+                    <a href="{{ route('brand.show', $brand->slug) }}"
+                       class="bg-white border border-gray-200 rounded-lg h-20 px-3 flex items-center justify-center text-center hover:border-accent hover:shadow-sm transition">
+                        @if($brand->logo)
+                            <x-store-image :src="$brand->imageUrl()" :alt="$brand->name" class="max-h-12 w-auto object-contain"/>
+                        @else
+                            <span class="font-semibold text-slate-700">{{ $brand->name }}</span>
+                        @endif
                     </a>
-                </div>
-                <div class="mb-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-                        @foreach($products as $product)
-                            @include('partials.product-card', ['product' => $product])
-                        @endforeach
-                    </div>
-                </div>
-            </section>
-        @endif
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+    @include('partials.product-row', ['title' => Content::text('home.new_title'), 'products' => $newArrivals, 'link' => route('shop.index', ['sort' => 'latest'])])
+
+    {{-- Category rows (Website → Home sections) --}}
+    @foreach($homepageCategorySections as $section)
+        @include('partials.product-row', [
+            'title'    => $section->category->name,
+            'products' => $section->products,
+            'link'     => route('category.show', $section->category->slug),
+        ])
     @endforeach
 @endsection
 
@@ -1972,6 +2288,7 @@ Thanks,<br>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="error-report-url" content="{{ route('client-errors.store') }}">
     <title>@yield('title', $storeName)</title>
     <meta name="description" content="{{ $metaDescription }}">
     <link rel="canonical" href="{{ url()->current() }}">
@@ -2719,6 +3036,26 @@ Thanks,<br>
 </div>
 
 
+--- FILE: resources/views/partials/product-row.blade.php ---
+
+{{-- A titled row of product cards (home page blocks and category sections) --}}
+@if($products->isNotEmpty())
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
+            <h2 class="text-xl font-semibold">{{ $title }}</h2>
+            @if($link)
+                <a href="{{ $link }}" class="text-xs text-accent-ink hover:underline">{{ content('home.section_view_all') }}</a>
+            @endif
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+            @foreach($products as $product)
+                @include('partials.product-card', ['product' => $product])
+            @endforeach
+        </div>
+    </section>
+@endif
+
+
 --- FILE: resources/views/product/show.blade.php ---
 
 @extends('layouts.frontend')
@@ -2788,8 +3125,12 @@ Thanks,<br>
             <div class="space-y-4">
                 @if($product->company)
                     <div class="text-sm text-gray-600">
-                        <span class="font-semibold">Company:</span>
-                        <span>{{ $product->company->name }}</span>
+                        <span class="font-semibold">Brand:</span>
+                        @if($product->company->is_active)
+                            <a href="{{ route('brand.show', $product->company->slug) }}" class="text-accent-ink hover:underline">{{ $product->company->name }}</a>
+                        @else
+                            <span>{{ $product->company->name }}</span>
+                        @endif
                     </div>
                 @endif
 
@@ -2825,6 +3166,27 @@ Thanks,<br>
                     @endif
                 </div>
 
+                {{-- Other sizes (products sharing the same size group – set in the admin) --}}
+                @php $otherSizes = $product->otherSizes(); @endphp
+                @if($otherSizes->isNotEmpty())
+                    <div>
+                        <div class="text-xs font-semibold text-gray-700 mb-2">{{ \App\Support\Content::text('pages.product_other_sizes') }}</div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border-2 border-accent bg-accent/10 text-xs font-semibold text-slate-900" aria-current="true">
+                                {{ $product->sizeLabel() }}
+                                <span class="font-normal text-gray-600">Rs {{ number_format($product->getDisplayPrice()) }}</span>
+                            </span>
+                            @foreach($otherSizes as $size)
+                                <a href="{{ route('product.show', $size->slug) }}"
+                                   class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border border-gray-300 bg-white text-xs font-semibold text-slate-800 hover:border-accent">
+                                    {{ $size->sizeLabel() }}
+                                    <span class="font-normal text-gray-600">Rs {{ number_format($size->getDisplayPrice()) }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="border-t border-gray-200 pt-4">
                     <p class="text-sm text-gray-700 mb-3">
                         {{ $product->short_description ?: \App\Support\Content::text('pages.product_no_description') }}
@@ -2837,6 +3199,12 @@ Thanks,<br>
                 </div>
 
                     <div class="border-t border-gray-200 pt-4 flex flex-col gap-3 max-w-sm">
+                        @if($product->customer_note)
+                            <div class="text-sm text-slate-800 bg-accent/10 border border-accent/40 rounded-md px-3 py-2">
+                                ℹ️ {{ $product->customer_note }}
+                            </div>
+                        @endif
+
                         <form
                             action="{{ route('cart.add', $product) }}"
                             method="POST"
@@ -2894,7 +3262,18 @@ Thanks,<br>
                             </button>
                         </form>
 
-
+                        @php
+                            $askWhatsApp = \App\Models\SiteSetting::current()->whatsappLink(
+                                'Assalam o Alaikum, I have a question about: ' . $product->name . ' – ' . route('product.show', $product->slug)
+                            );
+                        @endphp
+                        @if($askWhatsApp)
+                            <a href="{{ $askWhatsApp }}" target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                                <x-store-icon name="whatsapp" class="w-4 h-4"/>
+                                {{ \App\Support\Content::text('pages.product_whatsapp_button') }}
+                            </a>
+                        @endif
                     </div>
 
             </div>
@@ -2912,6 +3291,163 @@ Thanks,<br>
             </div>
         </section>
     @endif
+@endsection
+
+
+--- FILE: resources/views/quotes/create.blade.php ---
+
+@extends('layouts.frontend')
+
+@php use App\Support\Content; @endphp
+
+@section('title', Content::text('pages.quote_title') . Content::text('seo.title_suffix'))
+@section('meta_description', Content::text('pages.quote_intro'))
+
+@push('meta')
+    @if(config('orders.turnstile.site_key'))
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    @endif
+@endpush
+
+@section('content')
+    @php
+        $input = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent';
+        $label = 'block text-xs font-semibold text-gray-700 mb-1';
+    @endphp
+
+    <section class="bg-brand text-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <h1 class="text-2xl font-bold">{{ Content::text('pages.quote_title') }}</h1>
+            <p class="mt-1 text-sm text-gray-300 max-w-3xl">{{ Content::text('pages.quote_intro') }}</p>
+        </div>
+    </section>
+
+    <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white border border-gray-100 rounded-lg p-5 sm:p-6">
+            @if($errors->has('form'))
+                <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ $errors->first('form') }}</div>
+            @endif
+
+            <form action="{{ route('quotes.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4" data-disable-on-submit>
+                @csrf
+
+                {{-- Honeypot field --}}
+                <div style="display:none;" aria-hidden="true">
+                    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="name" class="{{ $label }}">Your name <span class="text-red-500">*</span></label>
+                        <input id="name" name="name" value="{{ old('name') }}" required maxlength="100" autocomplete="name" class="{{ $input }}">
+                        @error('name')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="phone" class="{{ $label }}">Mobile / WhatsApp number <span class="text-red-500">*</span></label>
+                        <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required maxlength="25" inputmode="tel" autocomplete="tel" placeholder="0300 1234567" class="{{ $input }}">
+                        @error('phone')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="business_name" class="{{ $label }}">Business / company name <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input id="business_name" name="business_name" value="{{ old('business_name') }}" maxlength="150" autocomplete="organization" class="{{ $input }}">
+                    </div>
+                    <div>
+                        <label for="city" class="{{ $label }}">City / area <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input id="city" name="city" value="{{ old('city') }}" maxlength="100" class="{{ $input }}">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="email" class="{{ $label }}">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" class="{{ $input }}">
+                        @error('email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+
+                <div>
+                    <label for="items" class="{{ $label }}">{{ Content::text('pages.quote_items_label') }}</label>
+                    <textarea id="items" name="items" rows="6" maxlength="5000" placeholder="{{ content('pages.quote_items_placeholder') }}" class="{{ $input }}">{{ old('items') }}</textarea>
+                    @error('items')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label for="attachment" class="{{ $label }}">{{ Content::text('pages.quote_attachment_label') }}</label>
+                    <input id="attachment" type="file" name="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf"
+                           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand file:text-white file:text-sm">
+                    <p class="mt-1 text-[11px] text-gray-500">JPG, PNG, WebP or PDF, up to 10 MB.</p>
+                    @error('attachment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+
+                @if($cartItems->isNotEmpty())
+                    <div class="border border-gray-200 rounded-md p-3 bg-slate-50">
+                        <label class="flex items-center gap-2 text-sm font-medium">
+                            <input type="checkbox" name="include_cart" value="1" @checked(old('include_cart', true)) class="rounded border-gray-300 text-brand focus:ring-accent">
+                            {{ Content::text('pages.quote_include_cart') }} ({{ $cartItems->count() }} {{ \Illuminate\Support\Str::plural('item', $cartItems->count()) }})
+                        </label>
+                        <ul class="mt-2 text-xs text-gray-600 space-y-0.5 pl-6 list-disc">
+                            @foreach($cartItems as $item)
+                                <li>{{ $item->cart_quantity }} × {{ $item->name }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if(config('orders.turnstile.site_key'))
+                    <div>
+                        <div class="cf-turnstile" data-sitekey="{{ config('orders.turnstile.site_key') }}"></div>
+                        @error('cf-turnstile-response')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                @endif
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-md bg-accent text-on-accent text-sm font-bold hover:bg-accent/80 disabled:opacity-60 disabled:cursor-wait">
+                        {{ Content::text('pages.quote_submit') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+@endsection
+
+
+--- FILE: resources/views/quotes/thanks.blade.php ---
+
+@extends('layouts.frontend')
+
+@php use App\Support\Content; @endphp
+
+@section('title', Content::text('pages.quote_title') . Content::text('seo.title_suffix'))
+
+@push('meta')
+    <meta name="robots" content="noindex, nofollow">
+@endpush
+
+@section('content')
+    @php
+        $storeWhatsApp = \App\Models\SiteSetting::current()->whatsappLink(
+            $reference ? 'Assalam o Alaikum, I sent quote request ' . $reference . ' on your website.' : null
+        );
+    @endphp
+
+    <section class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6 text-center">
+            <h1 class="text-xl font-bold text-emerald-800">{{ Content::text('pages.quote_thanks_title') }}</h1>
+            @if($reference)
+                <p class="mt-2 text-sm text-emerald-900">Reference: <strong>{{ $reference }}</strong></p>
+            @endif
+            <p class="mt-2 text-sm text-emerald-900">{{ Content::text('pages.quote_thanks_text') }}</p>
+            <div class="mt-5 flex flex-wrap justify-center gap-3">
+                @if($storeWhatsApp)
+                    <a href="{{ $storeWhatsApp }}" target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                        {{ Content::text('pages.thankyou_whatsapp_button') }}
+                    </a>
+                @endif
+                <a href="{{ route('shop.index') }}"
+                   class="inline-flex items-center px-4 py-2 rounded-md border border-emerald-700 text-emerald-800 text-sm font-semibold hover:bg-emerald-100">
+                    Continue shopping
+                </a>
+            </div>
+        </div>
+    </section>
 @endsection
 
 
@@ -2992,53 +3528,74 @@ Thanks,<br>
 
 @php
     use App\Support\Content;
+    use App\Support\StructuredData;
+    use Illuminate\Support\Str;
 
+    // Plain shop, a category page (/category/{slug}) or a brand page (/brand/{slug})
     $currentCategory ??= null;
-    $filterAction = $currentCategory ? route('category.show', $currentCategory->slug) : route('shop.index');
+    $currentBrand ??= null;
+
+    if ($currentCategory) {
+        $heading      = $currentCategory->name;
+        $intro        = $currentCategory->description;
+        $pageTitle    = $currentCategory->meta_title ?: $currentCategory->name;
+        $pageDesc     = $currentCategory->meta_description ?: Str::limit((string) $currentCategory->description, 155);
+        $filterAction = route('category.show', $currentCategory->slug);
+        $crumbs       = StructuredData::categoryCrumbs($currentCategory);
+    } elseif ($currentBrand) {
+        $heading      = $currentBrand->name;
+        $intro        = $currentBrand->description;
+        $pageTitle    = $currentBrand->name;
+        $pageDesc     = Str::limit((string) ($currentBrand->description ?: $currentBrand->name . ' products at ' . \App\Models\SiteSetting::storeName()), 155);
+        $filterAction = route('brand.show', $currentBrand->slug);
+        $crumbs       = [[content('header.nav_home'), route('home')], [Content::text('pages.shop_title'), route('shop.index')], [$currentBrand->name, $filterAction]];
+    } else {
+        $heading      = Content::text('pages.shop_title');
+        $intro        = Content::text('pages.shop_intro');
+        $pageTitle    = $heading;
+        $pageDesc     = null;
+        $filterAction = route('shop.index');
+        $crumbs       = null;
+    }
 @endphp
 
-@if($currentCategory)
-    @section('title', ($currentCategory->meta_title ?: $currentCategory->name) . Content::text('seo.title_suffix'))
-    @section('meta_description', $currentCategory->meta_description ?: \Illuminate\Support\Str::limit((string) $currentCategory->description, 155))
-@else
-    @section('title', Content::text('pages.shop_title') . Content::text('seo.title_suffix'))
+@section('title', $pageTitle . Content::text('seo.title_suffix'))
+@if($pageDesc)
+    @section('meta_description', $pageDesc)
 @endif
 
-@if($currentCategory)
-    @push('meta')
-        {!! \App\Support\StructuredData::script(\App\Support\StructuredData::breadcrumbs(\App\Support\StructuredData::categoryCrumbs($currentCategory))) !!}
-    @endpush
-@endif
-
-{{-- Filter/sort combinations are not separate pages for Google --}}
-@if(request()->hasAny(['companies', 'on_sale', 'min_price', 'max_price', 'sort', 'per_page', 'page']) || (! $currentCategory && request()->has('categories')))
-    @push('meta')
+@push('meta')
+    @if($crumbs)
+        {!! StructuredData::script(StructuredData::breadcrumbs($crumbs)) !!}
+    @endif
+    {{-- Filtered/sorted/paged variants are not separate pages for Google --}}
+    @if(filled(request()->server('QUERY_STRING')))
         <meta name="robots" content="noindex, follow">
-    @endpush
-@endif
+    @endif
+@endpush
 
 @section('content')
     {{-- Header --}}
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
             <div>
-                @if($currentCategory)
+                @if($crumbs)
                     <nav class="text-xs text-gray-400 mb-1" aria-label="Breadcrumb">
-                        <a href="{{ route('home') }}" class="hover:text-accent">{{ content('header.nav_home') }}</a> /
-                        <a href="{{ route('shop.index') }}" class="hover:text-accent">{{ Content::text('pages.shop_title') }}</a>
-                        @if($currentCategory->parent)
-                            / <a href="{{ route('category.show', $currentCategory->parent->slug) }}" class="hover:text-accent">{{ $currentCategory->parent->name }}</a>
-                        @endif
+                        @foreach(array_slice($crumbs, 0, -1) as [$label, $url])
+                            <a href="{{ $url }}" class="hover:text-accent">{{ $label }}</a> /
+                        @endforeach
                     </nav>
-                    <h1 class="text-2xl font-bold">{{ $currentCategory->name }}</h1>
-                    @if($currentCategory->description)
-                        <p class="text-sm text-gray-300 mt-1 max-w-3xl">{{ $currentCategory->description }}</p>
+                @endif
+                <div class="flex items-center gap-3">
+                    @if($currentBrand?->logo)
+                        <span class="bg-white rounded-md p-1.5 h-12 flex items-center">
+                            <x-store-image :src="$currentBrand->imageUrl()" :alt="$currentBrand->name" class="max-h-9 w-auto object-contain"/>
+                        </span>
                     @endif
-                @else
-                    <h1 class="text-2xl font-bold">{{ Content::text('pages.shop_title') }}</h1>
-                    <p class="text-sm text-gray-300 mt-1">
-                        {{ Content::text('pages.shop_intro') }}
-                    </p>
+                    <h1 class="text-2xl font-bold">{{ $heading }}</h1>
+                </div>
+                @if($intro)
+                    <p class="text-sm text-gray-300 mt-1 max-w-3xl">{{ $intro }}</p>
                 @endif
             </div>
         </div>
@@ -3334,12 +3891,80 @@ Thanks,<br>
 === app/Models ===
 
 
+--- FILE: app/Models/AdminActivity.php ---
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
+
+// One entry in the admin activity log (see App\Models\Concerns\LogsAdminActivity)
+class AdminActivity extends Model
+{
+    use Prunable;
+
+    public const UPDATED_AT = null;
+
+    protected $fillable = [
+        'user_id',
+        'user_name',
+        'action',
+        'subject_type',
+        'subject_id',
+        'subject_label',
+        'changes',
+        'ip_address',
+    ];
+
+    protected function casts(): array
+    {
+        return ['changes' => 'array'];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    // Removed after a year by the daily `model:prune`
+    public function prunable(): Builder
+    {
+        return static::where('created_at', '<', now()->subYear());
+    }
+
+    // Record an action by the logged-in admin (no-op for customers, console and seeders)
+    public static function record(string $action, ?string $label = null, ?Model $subject = null, ?array $changes = null): void
+    {
+        $user = auth()->user();
+
+        if (! ($user instanceof User) || (app()->runningInConsole() && ! app()->runningUnitTests())) {
+            return;
+        }
+
+        static::create([
+            'user_id'       => $user->id,
+            'user_name'     => $user->name,
+            'action'        => $action,
+            'subject_type'  => $subject ? class_basename($subject) : null,
+            'subject_id'    => $subject?->getKey(),
+            'subject_label' => $label ? mb_substr($label, 0, 255) : null,
+            'changes'       => $changes ?: null,
+            'ip_address'    => request()->ip(),
+        ]);
+    }
+}
+
+
 --- FILE: app/Models/Category.php ---
 
 <?php
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -3347,7 +3972,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
-    use HasFactory, HasImageVariants;
+    use HasFactory, HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {
@@ -3402,6 +4027,7 @@ class Category extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -3409,7 +4035,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Company extends Model
 {
-    use HasFactory, HasImageVariants;
+    use HasFactory, HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {
@@ -3514,6 +4140,83 @@ trait HasImageVariants
 }
 
 
+--- FILE: app/Models/Concerns/LogsAdminActivity.php ---
+
+<?php
+
+namespace App\Models\Concerns;
+
+use App\Models\AdminActivity;
+use BackedEnum;
+
+/**
+ * Logs create/update/delete of this model by a logged-in admin into the activity log.
+ * Secrets and noise (timestamps, tokens, passwords) are never stored; long texts are shortened.
+ */
+trait LogsAdminActivity
+{
+    private static array $neverLogged = [
+        'created_at', 'updated_at', 'password', 'remember_token', 'public_token',
+        'app_authentication_secret', 'app_authentication_recovery_codes', 'last_login_at',
+    ];
+
+    public static function bootLogsAdminActivity(): void
+    {
+        static::created(fn ($model) => AdminActivity::record('created', $model->activityLabel(), $model));
+
+        static::updated(function ($model) {
+            $changes = [];
+
+            foreach (array_keys($model->getChanges()) as $field) {
+                if (in_array($field, self::$neverLogged, true)) {
+                    continue;
+                }
+
+                $changes[$field] = [
+                    'old' => self::forLog($model->getOriginal($field)),
+                    'new' => self::forLog($model->getAttribute($field)),
+                ];
+            }
+
+            if ($changes) {
+                AdminActivity::record('updated', $model->activityLabel(), $model, $changes);
+            }
+        });
+
+        static::deleted(fn ($model) => AdminActivity::record('deleted', $model->activityLabel(), $model));
+    }
+
+    // e.g. "Product: LED Bulb 12W", "Order: UE-100004"
+    public function activityLabel(): string
+    {
+        $name = $this->reference ?? $this->name ?? $this->title ?? $this->email ?? ('#' . $this->getKey());
+
+        return class_basename($this) . ': ' . $name;
+    }
+
+    private static function forLog(mixed $value): mixed
+    {
+        if ($value instanceof BackedEnum) {
+            return $value->value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i');
+        }
+
+        if (is_array($value)) {
+            return mb_strimwidth(json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 200, '…');
+        }
+
+        if (is_string($value)) {
+            return mb_strimwidth(strip_tags($value), 0, 200, '…');
+        }
+
+        return $value;
+    }
+}
+
+
 --- FILE: app/Models/ContactMessage.php ---
 
 <?php
@@ -3541,16 +4244,78 @@ class ContactMessage extends Model
 }
 
 
+--- FILE: app/Models/ErrorLog.php ---
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
+
+// One grouped error (see App\Support\ErrorRecorder). Shown in Settings → Error log.
+class ErrorLog extends Model
+{
+    use Prunable;
+
+    protected $fillable = [
+        'fingerprint',
+        'source',
+        'level',
+        'type',
+        'message',
+        'file',
+        'line',
+        'trace',
+        'url',
+        'method',
+        'context',
+        'user_id',
+        'ip_address',
+        'user_agent',
+        'occurrences',
+        'first_seen_at',
+        'last_seen_at',
+        'resolved_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'context'       => 'array',
+            'first_seen_at' => 'datetime',
+            'last_seen_at'  => 'datetime',
+            'resolved_at'   => 'datetime',
+        ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    // Removed by the daily `model:prune` once not seen for ERROR_LOG_RETENTION_DAYS (default 30)
+    public function prunable(): Builder
+    {
+        return static::where('last_seen_at', '<', now()->subDays((int) config('errorlog.retention_days', 30)));
+    }
+}
+
+
 --- FILE: app/Models/HomepageCategorySection.php ---
 
 <?php
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class HomepageCategorySection extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'category_id',
         'position',
@@ -3560,6 +4325,11 @@ class HomepageCategorySection extends Model
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    public function activityLabel(): string
+    {
+        return 'Home section: ' . ($this->category?->name ?? '#' . $this->id);
     }
 
     public function category()
@@ -3575,13 +4345,14 @@ class HomepageCategorySection extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Model;
 
 class HomepageSlider extends Model
 {
-    use HasImageVariants;
+    use HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {
@@ -3598,6 +4369,11 @@ class HomepageSlider extends Model
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    public function activityLabel(): string
+    {
+        return 'Home slide: ' . ($this->title ?: '#' . $this->id);
     }
 
     // Works for uploads on the public disk ("sliders/x.jpg") and legacy paths ("storage/hero/x.jpg")
@@ -3622,6 +4398,7 @@ class HomepageSlider extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Enums\OrderStatus;
 use App\Support\PakistaniPhone;
 use Illuminate\Database\Eloquent\Model;
@@ -3629,6 +4406,8 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'customer_name',
         'customer_phone',
@@ -3772,11 +4551,14 @@ class OrderItem extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 // CMS pages managed in the admin panel (About, Delivery & COD, Returns, Privacy, Terms, FAQ …)
 class Page extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'title',
         'slug',
@@ -3804,6 +4586,7 @@ class Page extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Models\Concerns\HasImageVariants;
 use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -3811,7 +4594,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    use HasFactory, HasImageVariants;
+    use HasFactory, HasImageVariants, LogsAdminActivity;
 
     protected function imageAttributes(): array
     {
@@ -3824,6 +4607,9 @@ class Product extends Model
         'name',
         'slug',
         'sku',
+        'size_group',
+        'size_label',
+        'customer_note',
         'price',
         'sale_price',
         'is_on_sale',
@@ -3867,6 +4653,26 @@ class Product extends Model
             : (float) $this->price;
     }
 
+    // Other visible products in the same size group (e.g. the 180 m coil of the same wire), cheapest first
+    public function otherSizes()
+    {
+        if (blank($this->size_group)) {
+            return collect();
+        }
+
+        return static::where('size_group', $this->size_group)
+            ->where('is_active', true)
+            ->whereKeyNot($this->getKey())
+            ->orderByRaw(static::effectivePriceSql())
+            ->get();
+    }
+
+    // Short text for size buttons
+    public function sizeLabel(): string
+    {
+        return $this->size_label ?: $this->name;
+    }
+
     // Main image (WebP copy of the requested size when available) or null
     public function imageUrl(string $size = 'thumb'): ?string
     {
@@ -3889,6 +4695,94 @@ class Product extends Model
     public static function effectivePriceSql(): string
     {
         return 'CASE WHEN is_on_sale = 1 AND sale_price > 0 THEN sale_price ELSE price END';
+    }
+}
+
+
+--- FILE: app/Models/QuoteRequest.php ---
+
+<?php
+
+namespace App\Models;
+
+use App\Enums\QuoteStatus;
+use App\Models\Concerns\LogsAdminActivity;
+use App\Support\PakistaniPhone;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+
+// Bulk / trade quote request from /bulk-quote (electricians, contractors, shops)
+class QuoteRequest extends Model
+{
+    use LogsAdminActivity;
+
+    public const ATTACHMENT_DISK = 'local'; // private: storage/app/private, never publicly reachable
+
+    protected $fillable = [
+        'name',
+        'phone',
+        'email',
+        'business_name',
+        'city',
+        'items',
+        'cart_items',
+        'attachment_path',
+        'attachment_name',
+        'status',
+        'admin_note',
+        'ip_address',
+        'user_agent',
+    ];
+
+    protected $hidden = ['ip_address', 'user_agent'];
+
+    protected function casts(): array
+    {
+        return [
+            'status'                 => QuoteStatus::class,
+            'cart_items'             => 'array',
+            'owner_whatsapp_sent_at' => 'datetime',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(fn (QuoteRequest $quote) => $quote->status ??= QuoteStatus::New);
+
+        // Short reference derived from the id: QR-100001
+        static::created(function (QuoteRequest $quote) {
+            $quote->reference = 'QR-' . (100000 + $quote->id);
+            $quote->saveQuietly();
+        });
+
+        // The uploaded list goes with the request
+        static::deleted(function (QuoteRequest $quote) {
+            if ($quote->attachment_path) {
+                Storage::disk(self::ATTACHMENT_DISK)->delete($quote->attachment_path);
+            }
+        });
+    }
+
+    public function activityLabel(): string
+    {
+        return 'Quote request: ' . ($this->reference ?? '#' . $this->id);
+    }
+
+    public function displayPhone(): string
+    {
+        return PakistaniPhone::display($this->phone);
+    }
+
+    public function whatsappUrl(?string $text = null): string
+    {
+        $url = 'https://wa.me/' . ltrim($this->phone, '+');
+
+        return $text ? $url . '?text=' . rawurlencode($text) : $url;
+    }
+
+    public function cartTotal(): float
+    {
+        return (float) collect($this->cart_items ?? [])->sum('line_total');
     }
 }
 
@@ -3919,11 +4813,14 @@ class SiteContent extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Support\PakistaniPhone;
 use Illuminate\Database\Eloquent\Model;
 
 class SiteSetting extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'store_name',
         'contact_phone',
@@ -3941,6 +4838,11 @@ class SiteSetting extends Model
         'footer_about',
         'opening_hours',
     ];
+
+    public function activityLabel(): string
+    {
+        return 'Website: Store & contact';
+    }
 
     // wa.me link to the store: uses whatsapp_url if set, otherwise the contact phone
     public function whatsappLink(?string $text = null): ?string
@@ -4009,6 +4911,7 @@ class SiteSetting extends Model
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use App\Enums\AdminRole;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
@@ -4025,7 +4928,7 @@ use SensitiveParameter;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, LogsAdminActivity;
 
     /**
      * The attributes that are mass assignable.
