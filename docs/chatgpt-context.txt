@@ -85,6 +85,9 @@ Route::post('/wishlist/add/{product}', [WishlistController::class, 'add'])->midd
 Route::post('/wishlist/remove/{product}', [WishlistController::class, 'remove'])->middleware('throttle:60,1')->name('wishlist.remove');
 Route::post('/wishlist/clear', [WishlistController::class, 'clear'])->middleware('throttle:60,1')->name('wishlist.clear');
 
+// Unknown URLs: answer 404 through the web middleware so the error page still sees the visitor's cart and wishlist
+Route::fallback(fn () => abort(404));
+
 
 === app/Http/Controllers ===
 
@@ -427,10 +430,13 @@ class ContactController extends Controller
         // Validate inputs (basic restrictions)
         $validated = $request->validate([
             'name'    => ['required', 'string', 'max:255'],
-            'email'   => ['required', 'email', 'max:255'],
-            'phone'   => ['nullable', 'string', 'max:50'],
+            'email'   => ['nullable', 'required_without:phone', 'email', 'max:255'],
+            'phone'   => ['nullable', 'required_without:email', 'string', 'max:50'],
             'subject' => ['nullable', 'string', 'max:255'],
             'message' => ['required', 'string', 'min:10', 'max:5000'],
+        ], [
+            'email.required_without' => 'Please give us an email or a phone number so we can reply.',
+            'phone.required_without' => 'Please give us a phone number or an email so we can reply.',
         ]);
 
         // Extra sanitization: strip HTML tags to avoid injection/XSS in stored data & emails
@@ -444,7 +450,7 @@ class ContactController extends Controller
         // Save to DB (using sanitized values)
         $contactMessage = ContactMessage::create([
             'name'       => $sanitized['name'],
-            'email'      => $sanitized['email'],
+            'email'      => $sanitized['email'] ?? null,
             'phone'      => $sanitized['phone'] ?? null,
             'subject'    => $sanitized['subject'] ?? null,
             'message'    => $sanitized['message'],
@@ -807,8 +813,11 @@ class ProductController extends Controller
         // else: no category/company filter
 
         // ---- Other filters ----
+        // Same rule as Product::isOnSale(): a real discount, not just the "on sale" tick
         if ($onSale) {
-            $query->where('is_on_sale', true);
+            $query->where('is_on_sale', true)
+                ->where('sale_price', '>', 0)
+                ->whereColumn('sale_price', '<', 'price');
         }
 
         // CAST the bounds: SQLite binds PHP floats as text, which never compares equal/between numbers
@@ -839,6 +848,11 @@ class ProductController extends Controller
         $products = $query
             ->paginate($perPage)
             ->withQueryString();
+
+        // Page number past the end (old link, fewer products now) → last real page instead of an empty grid
+        if ($products->isEmpty() && $products->currentPage() > 1 && $products->total() > 0) {
+            return $this->redirectToPage($request, $products->lastPage());
+        }
 
         // ---- Sidebar data: categories with counts ----
         $categories = Category::where('is_active', true)
@@ -922,6 +936,11 @@ class ProductController extends Controller
         $queryText   = trim($request->input('q', ''));
         $categoryId  = $request->input('category');
 
+        // Category picked but no words typed → that category's page
+        if ($queryText === '' && $categoryId && ($category = Category::where('is_active', true)->find($categoryId))) {
+            return redirect()->route('category.show', $category->slug);
+        }
+
         $products = collect();
 
         if ($queryText !== '' || $categoryId) {
@@ -942,14 +961,27 @@ class ProductController extends Controller
             $products = $productsQuery
                 ->paginate(12)
                 ->withQueryString();
+
+            if ($products->isEmpty() && $products->currentPage() > 1 && $products->total() > 0) {
+                return $this->redirectToPage($request, $products->lastPage());
+            }
         }
 
         return view('search.results', [
-            'query'    => $queryText,
-            'products' => $products,
+            'query'      => $queryText,
+            'products'   => $products,
+            'categories' => Category::where('is_active', true)->whereNull('parent_id')->orderBy('sort_order')->orderBy('name')->get(['name', 'slug']),
         ]);
     }
 
+    // Same URL with another page number. Built from the raw query string because category/brand pages
+    // add their own filter to the request, which shouldn't show up in the address bar.
+    private function redirectToPage(Request $request, int $page)
+    {
+        parse_str((string) $request->getQueryString(), $query);
+
+        return redirect()->to($request->url() . '?' . http_build_query(array_merge($query, ['page' => $page])));
+    }
 }
 
 
@@ -1317,7 +1349,7 @@ class WishlistController extends Controller
         </div>
     </section>
 
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         @if(session('success'))
             <div class="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">
                 {{ session('success') }}
@@ -1330,131 +1362,132 @@ class WishlistController extends Controller
         @endif
 
         @if($products->isEmpty())
-            <p class="text-sm text-gray-600">
-                {{ \App\Support\Content::text('pages.cart_empty') }}
-            </p>
-            <div class="mt-4">
-                <a href="{{ route('home') }}"
-                   class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
-                    Continue Shopping
-                </a>
+            <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                <x-store-icon name="cart" class="w-12 h-12 mx-auto text-gray-300"/>
+                <p class="mt-3 text-sm text-gray-700">{{ \App\Support\Content::text('pages.cart_empty') }}</p>
+                <div class="mt-4 flex flex-wrap justify-center gap-2">
+                    <a href="{{ route('shop.index') }}"
+                       class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
+                        Continue Shopping
+                    </a>
+                    <a href="{{ route('quotes.create') }}"
+                       class="inline-flex items-center justify-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">
+                        Request a quote
+                    </a>
+                </div>
             </div>
         @else
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                <div class="lg:col-span-2 space-y-3">
                     @foreach($products as $product)
-                        <div class="bg-white border border-gray-100 rounded-lg p-4 flex gap-4 items-start">
-                            <div class="w-20 h-20 bg-slate-50 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
-                                <x-store-image :src="$product->imageUrl()" :alt="$product->name" class="w-full h-full object-contain"/>
-                            </div>
-                            <div class="flex-1">
-                                <div class="flex justify-between gap-4">
-                                    <div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 flex gap-3 sm:gap-4">
+                            <a href="{{ route('product.show', $product->slug) }}"
+                               class="w-20 h-20 sm:w-24 sm:h-24 bg-slate-50 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
+                                <x-store-image :src="$product->imageUrl('thumb')" :alt="$product->name" class="w-full h-full object-contain"/>
+                            </a>
+
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
                                         <a href="{{ route('product.show', $product->slug) }}"
-                                           class="text-sm font-semibold text-slate-900 hover:text-accent-ink">
+                                           class="text-sm font-semibold text-slate-900 hover:text-accent-ink line-clamp-2">
                                             {{ $product->name }}
                                         </a>
-                                        @if($product->company)
-                                            <div class="text-xs text-gray-500">
-                                                {{ $product->company->name }}
-                                            </div>
-                                        @endif
-                                        @if($product->sku)
-                                            <div class="text-[11px] text-gray-400">
-                                                SKU: {{ $product->sku }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <div class="text-right text-sm">
-                                        <div class="font-semibold">
-                                            Rs {{ number_format($product->getDisplayPrice(), 2) }}
-                                        </div>
                                         <div class="text-xs text-gray-500">
-                                            per unit
+                                            {{ collect([$product->company?->name, $product->sku ? 'SKU ' . $product->sku : null])->filter()->join(' · ') }}
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="mt-3 flex flex-wrap items-center gap-3">
-                                    <form action="{{ route('cart.update', $product) }}" method="POST" class="flex items-center gap-2">
+                                    <form action="{{ route('cart.remove', $product) }}" method="POST" class="flex-shrink-0">
                                         @csrf
-                                        <label class="text-xs text-gray-600">Qty:</label>
-                                        <input
-                                            type="number"
-                                            name="quantity"
-                                            min="0"
-                                            value="{{ $product->cart_quantity }}"
-                                            class="w-20 border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
-                                        >
-                                        <button
-                                            type="submit"
-                                            class="text-xs px-3 py-1 rounded-md border border-brand text-brand hover:bg-brand hover:text-white"
-                                        >
-                                            Update
-                                        </button>
-                                    </form>
-
-                                    <form action="{{ route('cart.remove', $product) }}" method="POST">
-                                        @csrf
-                                        <button
-                                            type="submit"
-                                            class="text-xs px-3 py-1 rounded-md border border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                                        >
-                                            Remove
+                                        <button type="submit" aria-label="Remove {{ $product->name }}" title="Remove"
+                                                class="w-8 h-8 -mr-1 -mt-1 rounded-md flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50">
+                                            <x-store-icon name="trash" class="w-4 h-4"/>
                                         </button>
                                     </form>
                                 </div>
-                            </div>
 
-                            <div class="text-right text-sm font-semibold">
-                                Rs {{ number_format($product->cart_subtotal, 2) }}
+                                <div class="mt-3 flex flex-wrap items-end justify-between gap-2">
+                                    {{-- Quantity: − / + apply straight away; a typed number applies on change. Three small forms so each
+                                         button sends exactly one quantity (works without JavaScript too). --}}
+                                    <div class="inline-flex items-stretch rounded-md border border-gray-300 bg-white overflow-hidden">
+                                        <form action="{{ route('cart.update', $product) }}" method="POST">
+                                            @csrf
+                                            <input type="hidden" name="quantity" value="{{ $product->cart_quantity - 1 }}">
+                                            <button type="submit" aria-label="Decrease quantity of {{ $product->name }}"
+                                                    class="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100">
+                                                <x-store-icon :name="$product->cart_quantity > 1 ? 'minus' : 'trash'" class="w-4 h-4"/>
+                                            </button>
+                                        </form>
+                                        <form action="{{ route('cart.update', $product) }}" method="POST">
+                                            @csrf
+                                            <label for="qty-{{ $product->id }}" class="sr-only">Quantity of {{ $product->name }}</label>
+                                            <input id="qty-{{ $product->id }}" type="number" name="quantity" min="0"
+                                                   max="{{ \App\Support\Cart::MAX_LINE_QUANTITY }}" inputmode="numeric"
+                                                   value="{{ $product->cart_quantity }}" data-submit-on-change
+                                                   class="w-12 h-9 border-0 border-x border-gray-300 text-center text-sm px-0 focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none">
+                                        </form>
+                                        <form action="{{ route('cart.update', $product) }}" method="POST">
+                                            @csrf
+                                            <input type="hidden" name="quantity" value="{{ min($product->cart_quantity + 1, \App\Support\Cart::MAX_LINE_QUANTITY) }}">
+                                            <button type="submit" aria-label="Increase quantity of {{ $product->name }}"
+                                                    class="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100">
+                                                <x-store-icon name="plus" class="w-4 h-4"/>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <div class="text-right">
+                                        <div class="text-sm font-bold text-slate-900">{{ rupees($product->cart_subtotal) }}</div>
+                                        @if($product->cart_quantity > 1)
+                                            <div class="text-[11px] text-gray-500">{{ rupees($product->getDisplayPrice()) }} each</div>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     @endforeach
+
+                    <div class="flex items-center justify-between pt-1">
+                        <a href="{{ route('shop.index') }}" class="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
+                            <x-store-icon name="arrow-left" class="w-4 h-4"/> Continue shopping
+                        </a>
+                        <form action="{{ route('cart.clear') }}" method="POST" data-confirm="Remove all items from your cart?">
+                            @csrf
+                            <button type="submit" class="text-xs text-gray-500 hover:text-red-600 underline">Clear cart</button>
+                        </form>
+                    </div>
                 </div>
 
                 {{-- Summary --}}
-                <div class="bg-white border border-gray-100 rounded-lg p-4 h-fit">
+                @php $itemCount = $products->sum('cart_quantity'); @endphp
+                <div class="bg-white border border-gray-200 rounded-lg p-4 h-fit lg:sticky lg:top-4">
                     <h2 class="text-sm font-semibold mb-3">Order Summary</h2>
 
                     <div class="flex justify-between items-center mb-2 text-sm">
-                        <span>Subtotal</span>
-                        <span>Rs {{ number_format($total, 2) }}</span>
+                        <span>Subtotal ({{ $itemCount }} {{ \Illuminate\Support\Str::plural('item', $itemCount) }})</span>
+                        <span>{{ rupees($total) }}</span>
                     </div>
                     <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
                         <span>Delivery</span>
                         <span>Confirmed on call</span>
                     </div>
 
-                    <div class="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center font-semibold text-sm">
+                    <div class="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center font-semibold">
                         <span>Total</span>
-                        <span>Rs {{ number_format($total, 2) }}</span>
+                        <span class="text-lg">{{ rupees($total) }}</span>
                     </div>
 
                     <div class="mt-4 flex flex-col gap-2">
-                        <a
-                            href="{{ route('checkout.show') }}"
-                            class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
-                        >
+                        <a href="{{ route('checkout.show') }}"
+                           class="inline-flex items-center justify-center px-4 py-3 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
                             {{ \App\Support\Content::text('pages.cart_checkout_button') }}
                         </a>
                         <p class="text-[11px] text-gray-500 text-center">
                             {{ \App\Support\Content::text('pages.cart_cod_note') }}
                         </p>
-
                         <a href="{{ route('quotes.create') }}" class="text-xs text-center text-accent-ink hover:underline">
                             {{ \App\Support\Content::text('pages.cart_quote_link') }}
                         </a>
-
-                        <form action="{{ route('cart.clear') }}" method="POST">
-                            @csrf
-                            <button
-                                type="submit"
-                                class="w-full inline-flex items-center justify-center px-4 py-2 rounded-md border border-gray-300 text-xs text-gray-600 hover:bg-gray-100"
-                            >
-                                Clear Cart
-                            </button>
-                        </form>
                     </div>
                 </div>
             </div>
@@ -1495,16 +1528,48 @@ class WishlistController extends Controller
         </div>
     </section>
 
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        @php $itemCount = $products->sum('cart_quantity'); @endphp
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {{-- Form --}}
-            <div class="lg:col-span-2">
+            <div class="lg:col-span-2 space-y-4">
+                {{-- Phones: compact order summary above the form (the full one sits in the sidebar on desktop) --}}
+                <details class="lg:hidden bg-white border border-gray-200 rounded-lg group">
+                    <summary class="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                        <span class="text-sm text-slate-800">
+                            <span class="font-semibold">{{ $itemCount }} {{ \Illuminate\Support\Str::plural('item', $itemCount) }}</span>
+                            <span class="text-gray-500">· show details</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 font-bold text-slate-900">
+                            {{ rupees($total) }}
+                            <x-store-icon name="chevron-down" class="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180"/>
+                        </span>
+                    </summary>
+                    <ul class="divide-y divide-gray-100 text-sm border-t border-gray-100 px-4">
+                        @foreach($products as $product)
+                            <li class="py-2 flex justify-between gap-3">
+                                <span class="text-slate-800 min-w-0">{{ $product->name }} <span class="text-xs text-gray-500">× {{ $product->cart_quantity }}</span></span>
+                                <span class="whitespace-nowrap font-medium">{{ rupees($product->cart_subtotal) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="px-4 py-2 border-t border-gray-100 flex justify-between text-xs">
+                        <span class="text-gray-500">{{ \App\Support\Content::text('pages.delivery_note') }}</span>
+                        <a href="{{ route('cart.index') }}" class="text-accent-ink hover:underline whitespace-nowrap ml-3">Edit cart</a>
+                    </div>
+                </details>
+
                 <div class="bg-white border border-gray-100 rounded-lg p-5 sm:p-6">
                     <h2 class="text-base font-semibold text-slate-900 mb-1">Your details</h2>
                     <p class="text-xs text-gray-500 mb-5">
                         Only your name and mobile number are required.
                     </p>
 
+                    @if($errors->any() && ! $errors->has('form'))
+                        <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                            Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+                        </div>
+                    @endif
                     @if($errors->has('form'))
                         <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                             {{ $errors->first('form') }}
@@ -1534,10 +1599,11 @@ class WishlistController extends Controller
                                     required
                                     maxlength="100"
                                     autocomplete="name"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                    @error('name') aria-invalid="true" aria-describedby="name-error" @enderror
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('name') !border-red-500 bg-red-50/40 @enderror"
                                 >
                                 @error('name')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
 
@@ -1555,10 +1621,11 @@ class WishlistController extends Controller
                                     inputmode="tel"
                                     autocomplete="tel"
                                     placeholder="0300 1234567"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                    @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('phone') !border-red-500 bg-red-50/40 @enderror"
                                 >
                                 @error('phone')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                         </div>
@@ -1574,10 +1641,11 @@ class WishlistController extends Controller
                                 value="{{ old('email') }}"
                                 maxlength="150"
                                 autocomplete="email"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('email') !border-red-500 bg-red-50/40 @enderror"
                             >
                             @error('email')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -1592,10 +1660,11 @@ class WishlistController extends Controller
                                 maxlength="500"
                                 autocomplete="street-address"
                                 placeholder="House, street, area, city"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('address') aria-invalid="true" aria-describedby="address-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('address') !border-red-500 bg-red-50/40 @enderror"
                             >{{ old('address') }}</textarea>
                             @error('address')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="address-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -1609,10 +1678,11 @@ class WishlistController extends Controller
                                 rows="3"
                                 maxlength="1000"
                                 placeholder="e.g. best time to call, required wire length, delivery instructions…"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('comment') aria-invalid="true" aria-describedby="comment-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('comment') !border-red-500 bg-red-50/40 @enderror"
                             >{{ old('comment') }}</textarea>
                             @error('comment')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="comment-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -1620,7 +1690,7 @@ class WishlistController extends Controller
                             <div>
                                 <div class="cf-turnstile" data-sitekey="{{ config('orders.turnstile.site_key') }}"></div>
                                 @error('cf-turnstile-response')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="cf-turnstile-response-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                         @endif
@@ -1642,7 +1712,7 @@ class WishlistController extends Controller
 
             {{-- Summary --}}
             <div class="space-y-4">
-                <div class="bg-white border border-gray-100 rounded-lg p-4">
+                <div class="hidden lg:block bg-white border border-gray-100 rounded-lg p-4 lg:sticky lg:top-4">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="text-sm font-semibold">Order Summary</h2>
                         <a href="{{ route('cart.index') }}" class="text-xs text-accent-ink hover:underline">Edit cart</a>
@@ -1655,14 +1725,14 @@ class WishlistController extends Controller
                                     {{ $product->name }}
                                     <span class="text-xs text-gray-500">× {{ $product->cart_quantity }}</span>
                                 </span>
-                                <span class="whitespace-nowrap font-medium">Rs {{ number_format($product->cart_subtotal) }}</span>
+                                <span class="whitespace-nowrap font-medium">{{ rupees($product->cart_subtotal) }}</span>
                             </li>
                         @endforeach
                     </ul>
 
                     <div class="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center font-semibold text-sm">
                         <span>Total</span>
-                        <span>Rs {{ number_format($total) }}</span>
+                        <span>{{ rupees($total) }}</span>
                     </div>
                     <p class="mt-1 text-[11px] text-gray-500">{{ \App\Support\Content::text('pages.delivery_note') }}</p>
                 </div>
@@ -1738,6 +1808,42 @@ class WishlistController extends Controller
         @case('x')
             <path d="M4 4l16 16M20 4L4 20"/>
             @break
+        @case('cart')
+            <path d="M3 4h2l2.4 10.2a1 1 0 001 .8h8.9a1 1 0 001-.8L20 7H6.2"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>
+            @break
+        @case('heart')
+            <path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/>
+            @break
+        @case('box')
+            <path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>
+            @break
+        @case('search')
+            <circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>
+            @break
+        @case('menu')
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+            @break
+        @case('filter')
+            <path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"/>
+            @break
+        @case('close')
+            <path d="M6 6l12 12M18 6L6 18"/>
+            @break
+        @case('trash')
+            <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>
+            @break
+        @case('plus')
+            <path d="M12 5v14M5 12h14"/>
+            @break
+        @case('minus')
+            <path d="M5 12h14"/>
+            @break
+        @case('chevron-down')
+            <path d="M6 9l6 6 6-6"/>
+            @break
+        @case('arrow-left')
+            <path d="M19 12H5M11 6l-6 6 6 6"/>
+            @break
         @default
             <circle cx="12" cy="12" r="3"/>
     @endswitch
@@ -1782,8 +1888,8 @@ class WishlistController extends Controller
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Call Us</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            📞
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="phone" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold">
@@ -1805,8 +1911,8 @@ class WishlistController extends Controller
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Email</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            ✉️
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="mail" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold">
@@ -1828,15 +1934,14 @@ class WishlistController extends Controller
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Store Location</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            📍
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="location" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold mb-1">
                                 {{ $settings->store_name }}
                             </div>
-                            <div class="text-xs text-gray-600 whitespace-pre-line">
-                                {{ $settings->store_address }}
+                            <div class="text-xs text-gray-600 whitespace-pre-line">{{ $settings->store_address }}
                             </div>
                         </div>
                     </div>
@@ -1845,9 +1950,14 @@ class WishlistController extends Controller
 
             {{-- Right: contact form --}}
             <div class="lg:col-span-2">
-                <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-6">
+                <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-5 sm:p-6">
                     <h2 class="text-lg font-semibold mb-4">Send us a message</h2>
 
+                    @if($errors->any() && ! $errors->has('form'))
+                    <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                        Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+                    </div>
+                    @endif
                     @if($errors->has('form'))
                         <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                             {{ $errors->first('form') }}
@@ -1860,102 +1970,83 @@ class WishlistController extends Controller
                         </div>
                     @endif
 
-                    <form action="{{ route('contact.submit') }}" method="POST" class="space-y-4">
+                    <form action="{{ route('contact.submit') }}" method="POST" class="space-y-4" data-disable-on-submit>
                         @csrf
 
                         {{-- Honeypot field --}}
-                        <div style="display:none;">
+                        <div style="display:none;" aria-hidden="true">
                             <label>Website
-                                <input type="text" name="website" autocomplete="off">
+                                <input type="text" name="website" tabindex="-1" autocomplete="off">
                             </label>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Name <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value="{{ old('name') }}"
-                                    required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('name')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Email <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value="{{ old('email') }}"
-                                    required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('email')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Phone
-                                </label>
-                                <input
-                                    type="text"
-                                    name="phone"
-                                    value="{{ old('phone') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('phone')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Subject
-                                </label>
-                                <input
-                                    type="text"
-                                    name="subject"
-                                    value="{{ old('subject') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('subject')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                Message <span class="text-red-500">*</span>
+                            <label for="contact-name" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Name <span class="text-red-500">*</span>
                             </label>
-                            <textarea
-                                name="message"
-                                rows="5"
-                                required
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                            >{{ old('message') }}</textarea>
-                            @error('message')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <input id="contact-name" type="text" name="name" value="{{ old('name') }}" required maxlength="255" autocomplete="name"
+                                   @error('name') aria-invalid="true" aria-describedby="name-error" @enderror
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('name') !border-red-500 bg-red-50/40 @enderror">
+                            @error('name')
+                            <p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="contact-phone" class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Phone / WhatsApp
+                                </label>
+                                <input id="contact-phone" type="tel" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" autocomplete="tel"
+                                       placeholder="0300 1234567"
+                                       @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('phone') !border-red-500 bg-red-50/40 @enderror">
+                                @error('phone')
+                                <p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label for="contact-email" class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Email
+                                </label>
+                                <input id="contact-email" type="email" name="email" value="{{ old('email') }}" maxlength="255" autocomplete="email"
+                                       @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('email') !border-red-500 bg-red-50/40 @enderror">
+                                @error('email')
+                                <p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <p class="sm:col-span-2 -mt-2 text-[11px] text-gray-500">Give us a phone number or an email (or both) so we can reply.</p>
+                        </div>
+
+                        <div>
+                            <label for="contact-subject" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Subject <span class="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input id="contact-subject" type="text" name="subject" value="{{ old('subject') }}" maxlength="255"
+                                   @error('subject') aria-invalid="true" aria-describedby="subject-error" @enderror
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('subject') !border-red-500 bg-red-50/40 @enderror">
+                            @error('subject')
+                            <p id="subject-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div>
-                            <button
-                                type="submit"
-                                class="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
-                            >
+                            <label for="contact-message" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Message <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="contact-message" name="message" rows="5" required minlength="10" maxlength="5000"
+                                      @error('message') aria-invalid="true" aria-describedby="message-error" @enderror
+                                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('message') !border-red-500 bg-red-50/40 @enderror">{{ old('message') }}</textarea>
+                            @error('message')
+                            <p id="message-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <button type="submit"
+                                    class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90 disabled:opacity-60 disabled:cursor-wait">
                                 {{ \App\Support\Content::text('pages.contact_button') }}
                             </button>
                         </div>
@@ -1985,7 +2076,7 @@ class WishlistController extends Controller
             @elseif($settings->map_embed_url && str_starts_with($settings->map_embed_url, 'https://'))
                 <a href="{{ $settings->map_embed_url }}" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
-                    📍 Open our location in Google Maps
+                    <x-store-icon name="location" class="w-4 h-4"/> Open our location in Google Maps
                 </a>
             @endif
 
@@ -2009,7 +2100,6 @@ class WishlistController extends Controller
                     @endforeach
                 </div>
             @endif
-            </div>
         </div>
     </section>
 @endsection
@@ -2023,7 +2113,9 @@ class WishlistController extends Controller
 You have received a new message from the contact form on **{{ \App\Models\SiteSetting::storeName() }}**.
 
 **Name:** {{ $contactMessage->name }}<br>
+@if($contactMessage->email)
 **Email:** {{ $contactMessage->email }}<br>
+@endif
 @if($contactMessage->phone)
 **Phone:** {{ $contactMessage->phone }}<br>
 @endif
@@ -2196,6 +2288,139 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 </x-mail::message>
 
 
+--- FILE: resources/views/errors/403.blade.php ---
+
+@include('errors.branded', [
+    'code' => 403,
+    'heading' => 'Not allowed',
+    'message' => 'You don\'t have permission to open this page.',
+])
+
+
+--- FILE: resources/views/errors/404.blade.php ---
+
+@include('errors.branded', [
+    'code' => 404,
+    'heading' => 'Page not found',
+    'message' => 'The page you are looking for may have moved, or the product is no longer listed. Try a search or browse the shop.',
+    'showSearch' => true,
+])
+
+
+--- FILE: resources/views/errors/419.blade.php ---
+
+@include('errors.branded', [
+    'code' => 419,
+    'heading' => 'This page expired',
+    'message' => 'The form was open for a long time, so it expired for your security. Please go back, refresh the page and send it again.',
+    'showBack' => true,
+])
+
+
+--- FILE: resources/views/errors/429.blade.php ---
+
+@include('errors.branded', [
+    'code' => 429,
+    'heading' => 'Please slow down',
+    'message' => 'Too many tries in a short time. Please wait a minute and try again – or call or WhatsApp us.',
+    'showBack' => true,
+])
+
+
+--- FILE: resources/views/errors/500.blade.php ---
+
+@include('errors.minimal-store', [
+    'code' => 500,
+    'heading' => 'Something went wrong',
+    'message' => 'Sorry – we hit a problem on our side and have been notified. Please try again in a minute. If you were placing an order, call or WhatsApp us and we will help you straight away.',
+])
+
+
+--- FILE: resources/views/errors/503.blade.php ---
+
+@include('errors.minimal-store', [
+    'code' => 503,
+    'heading' => 'Back in a few minutes',
+    'message' => 'We are updating the store right now. Please check back shortly.',
+])
+
+
+--- FILE: resources/views/errors/branded.blade.php ---
+
+{{-- Shared look for customer-facing error pages that can use the normal store layout (404, 403, 419, 429) --}}
+@extends('layouts.frontend')
+
+@section('title', $heading . \App\Support\Content::text('seo.title_suffix'))
+
+@push('meta')
+    <meta name="robots" content="noindex">
+@endpush
+
+@section('content')
+    <section class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
+        <p class="text-5xl sm:text-6xl font-extrabold text-accent-ink/80">{{ $code }}</p>
+        <h1 class="mt-3 text-2xl sm:text-3xl font-bold text-slate-900">{{ $heading }}</h1>
+        <p class="mt-3 text-sm sm:text-base text-gray-600">{{ $message }}</p>
+
+        @if($showSearch ?? false)
+            <form action="{{ route('search') }}" method="GET" role="search" class="mt-6 flex gap-2 max-w-md mx-auto">
+                <input type="search" name="q" placeholder="{{ content('header.search_placeholder') }}" aria-label="{{ content('header.search_placeholder') }}"
+                       class="flex-1 min-w-0 rounded-md border border-gray-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-accent">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
+                    <x-store-icon name="search" class="w-4 h-4"/> <span class="hidden sm:inline">Search</span>
+                </button>
+            </form>
+        @endif
+
+        <div class="mt-6 flex flex-wrap justify-center gap-2">
+            @if($showBack ?? false)
+                <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('home') }}"
+                   class="inline-flex items-center gap-1 px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
+                    <x-store-icon name="arrow-left" class="w-4 h-4"/> Go back and try again
+                </a>
+            @endif
+            <a href="{{ route('home') }}" class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">Home</a>
+            <a href="{{ route('shop.index') }}" class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">Shop</a>
+            <a href="{{ route('contact.show') }}" class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">Contact us</a>
+        </div>
+    </section>
+@endsection
+
+
+--- FILE: resources/views/errors/minimal-store.blade.php ---
+
+{{-- Server-side failures (500, 503): plain HTML with inline styles – no database, settings or built assets,
+     because those may be exactly what is broken --}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ $heading }} – {{ config('app.name') }}</title>
+    <style>
+        *{box-sizing:border-box}
+        body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+             font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#f8fafc;color:#0f172a}
+        main{max-width:30rem;text-align:center}
+        .code{font-size:3.5rem;font-weight:800;color:#94a3b8;margin:0}
+        h1{font-size:1.5rem;margin:.5rem 0}
+        p{color:#475569;line-height:1.6;margin:.75rem 0}
+        a{display:inline-block;margin-top:1rem;padding:.65rem 1.25rem;border-radius:.375rem;background:#0f172a;color:#fff;
+          text-decoration:none;font-weight:600;font-size:.9rem}
+    </style>
+</head>
+<body>
+<main>
+    <p class="code">{{ $code }}</p>
+    <h1>{{ $heading }}</h1>
+    <p>{{ $message }}</p>
+    <a href="{{ url('/') }}">Back to the home page</a>
+</main>
+</body>
+</html>
+
+
 --- FILE: resources/views/filament/pages/backups.blade.php ---
 
 <x-filament-panels::page>
@@ -2342,14 +2567,14 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
     @if(content('home.benefits_enabled') && $benefits->isNotEmpty())
         <section class="bg-white border-t border-b border-slate-100">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 {{ $benefits->count() >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3' }} gap-6">
+                <div class="grid grid-cols-2 {{ $benefits->count() >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3' }} gap-x-4 gap-y-5 sm:gap-6">
                     @foreach($benefits as $benefit)
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-brand text-accent flex items-center justify-center">
-                                <x-store-icon :name="$benefit['icon'] ?? 'check'" class="w-5 h-5"/>
+                        <div class="flex items-start gap-2.5 sm:gap-3">
+                            <div class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-brand text-accent flex items-center justify-center">
+                                <x-store-icon :name="$benefit['icon'] ?? 'check'" class="w-4 h-4 sm:w-5 sm:h-5"/>
                             </div>
                             <div>
-                                <div class="font-semibold text-sm sm:text-base text-slate-900">{{ $benefit['title'] }}</div>
+                                <div class="font-semibold text-[13px] sm:text-base text-slate-900 leading-tight">{{ $benefit['title'] }}</div>
                                 @if(filled($benefit['text'] ?? null))
                                     <div class="text-xs sm:text-sm text-slate-500">{{ $benefit['text'] }}</div>
                                 @endif
@@ -2493,21 +2718,21 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 
     {{-- Main header --}}
     <header class="bg-brand text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 md:gap-4">
             {{-- Logo / brand --}}
             <a href="{{ route('home') }}" class="flex items-center gap-2 min-w-0">
                 @if($logoUrl)
-                    <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-10 w-auto max-w-[180px] object-contain">
+                    <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-9 md:h-10 w-auto max-w-[150px] md:max-w-[180px] object-contain">
                 @else
-                    <span class="bg-accent text-on-accent w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full font-extrabold text-lg">
+                    <span class="bg-accent text-on-accent w-9 h-9 md:w-10 md:h-10 flex-shrink-0 flex items-center justify-center rounded-full font-extrabold text-base md:text-lg">
                         {{ content('branding.logo_text') }}
                     </span>
                 @endif
                 @if(content('branding.show_name'))
-                    <span class="leading-tight hidden sm:block">
-                        <span class="block font-bold text-lg tracking-wide">{{ $storeName }}</span>
+                    <span class="leading-tight min-w-0">
+                        <span class="block font-bold text-base md:text-lg tracking-wide truncate">{{ $storeName }}</span>
                         @if(content('branding.tagline'))
-                            <span class="block text-[11px] text-gray-300">{{ content('branding.tagline') }}</span>
+                            <span class="hidden md:block text-[11px] text-gray-300 truncate">{{ content('branding.tagline') }}</span>
                         @endif
                     </span>
                 @endif
@@ -2519,7 +2744,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                     name="category"
                     form="header-search-form"
                     aria-label="{{ content('header.search_all_label') }}"
-                    class="bg-white/10 border border-white/20 text-sm rounded-md pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-accent [&>option]:text-gray-900"
+                    class="bg-white/10 border border-white/20 text-sm rounded-md pl-3 pr-8 py-2 max-w-[11rem] focus:outline-none focus:ring-2 focus:ring-accent [&>option]:text-gray-900"
                 >
                     <option value="">{{ content('header.search_all_label') }}</option>
                     @foreach($searchCategories as $cat)
@@ -2541,49 +2766,50 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                         >
                         <button type="submit" aria-label="Search"
                                 class="absolute inset-y-0 right-0 px-3 flex items-center justify-center text-gray-300 hover:text-accent">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                            </svg>
+                            <x-store-icon name="search" class="w-4 h-4"/>
                         </button>
                     </div>
                 </form>
             </div>
 
-            {{-- My orders / wishlist / cart + mobile buttons --}}
-            <div class="flex items-center gap-4">
-                <div class="hidden sm:flex items-center gap-3 text-xs">
-                    @if($showMyOrders)
-                        <a href="{{ route('orders.index') }}" class="flex items-center gap-1 hover:text-accent">
-                            📦 {{ content('header.nav_my_orders') }}
-                        </a>
-                    @endif
-
-                    @if($showWishlist)
-                        <a href="{{ route('wishlist.index') }}" class="flex items-center gap-1 hover:text-accent">
-                            ❤️ {{ content('header.nav_wishlist') }}
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-on-accent text-xs font-semibold" id="wishlist-count">{{ $wishlistCount }}</span>
-                        </a>
-                    @endif
-
-                    <a href="{{ route('cart.index') }}" class="flex items-center gap-1 hover:text-accent">
-                        🛒 {{ content('header.nav_cart') }}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-on-accent text-xs font-semibold" id="cart-count">{{ $cartCount }}</span>
+            {{-- Desktop: my orders / wishlist / cart --}}
+            <div class="hidden md:flex items-center gap-4 text-xs flex-shrink-0">
+                @if($showMyOrders)
+                    <a href="{{ route('orders.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                        <x-store-icon name="box" class="w-5 h-5"/> {{ content('header.nav_my_orders') }}
                     </a>
-                </div>
+                @endif
 
-                <button id="mobile-search-toggle" type="button" aria-label="Search"
-                        class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/10 text-gray-200">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                    </svg>
+                @if($showWishlist)
+                    <a href="{{ route('wishlist.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                        <x-store-icon name="heart" class="w-5 h-5"/> {{ content('header.nav_wishlist') }}
+                        <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-full bg-accent text-on-accent text-xs font-semibold" id="wishlist-count" data-wishlist-count>{{ $wishlistCount }}</span>
+                    </a>
+                @endif
+
+                <a href="{{ route('cart.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                    <x-store-icon name="cart" class="w-5 h-5"/> {{ content('header.nav_cart') }}
+                    <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-full bg-accent text-on-accent text-xs font-semibold" id="cart-count" data-cart-count>{{ $cartCount }}</span>
+                </a>
+            </div>
+
+            {{-- Phone / small tablet: search, cart (with count) and menu buttons --}}
+            <div class="flex md:hidden items-center gap-1.5 flex-shrink-0">
+                <button id="mobile-search-toggle" type="button" aria-label="Search" aria-controls="mobile-search-panel" aria-expanded="false"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="search" class="w-5 h-5"/>
                 </button>
 
-                <button id="mobile-menu-toggle" type="button"
-                        class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/10 text-gray-200">
-                    <span class="sr-only">Open main menu</span>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
+                <a href="{{ route('cart.index') }}" aria-label="{{ content('header.nav_cart') }}"
+                   class="relative inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="cart" class="w-5 h-5"/>
+                    <span data-cart-count data-hide-when-empty
+                          class="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-accent text-on-accent text-[11px] font-bold flex items-center justify-center {{ $cartCount ? '' : 'hidden' }}">{{ $cartCount }}</span>
+                </a>
+
+                <button id="mobile-menu-toggle" type="button" aria-label="Open main menu" aria-controls="mobile-menu-panel" aria-expanded="false"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="menu" class="w-5 h-5"/>
                 </button>
             </div>
         </div>
@@ -2594,44 +2820,59 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 <input type="search" name="q" value="{{ request('q') }}"
                        placeholder="{{ content('header.search_placeholder') }}"
                        aria-label="{{ content('header.search_placeholder') }}"
-                       class="flex-1 bg-white/10 border border-white/20 text-sm rounded-md px-3 py-2 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-accent">
-                <button type="submit" class="px-4 py-2 rounded-md bg-accent text-on-accent text-sm font-semibold">Go</button>
+                       class="flex-1 min-w-0 bg-white/10 border border-white/20 text-base rounded-md px-3 py-2 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-accent">
+                <button type="submit" class="px-4 py-2 rounded-md bg-accent text-on-accent text-sm font-semibold">Search</button>
             </form>
         </div>
 
         {{-- Mobile nav panel --}}
         <div id="mobile-menu-panel" class="md:hidden hidden bg-brand text-gray-100 border-t border-white/10">
-            <div class="px-4 pt-3 pb-4 space-y-3">
-                <a href="{{ route('home') }}" class="block py-1">{{ content('header.nav_home') }}</a>
+            <nav class="px-4 py-2 text-[15px]" aria-label="Mobile">
+                <a href="{{ route('home') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_home') }}</a>
+                <a href="{{ route('shop.index') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_shop') }}</a>
 
-                <details class="border-t border-white/10 pt-3">
-                    <summary class="list-none flex items-center justify-between py-1 cursor-pointer">
+                <details class="border-b border-white/10 group">
+                    <summary class="list-none flex items-center justify-between py-3 cursor-pointer">
                         <span>{{ content('header.nav_categories') }}</span>
-                        <span class="text-xs">▾</span>
+                        <x-store-icon name="chevron-down" class="w-4 h-4 transition group-open:rotate-180"/>
                     </summary>
-                    <div class="mt-2 space-y-1 pl-3 max-h-64 overflow-y-auto text-sm">
+                    <div class="pb-2 pl-3 grid grid-cols-2 gap-x-3 text-sm text-gray-300">
                         @foreach($searchCategories as $category)
-                            <a href="{{ route('category.show', $category->slug) }}" class="block py-1">{{ $category->name }}</a>
+                            <a href="{{ route('category.show', $category->slug) }}" class="py-2 truncate hover:text-accent">{{ $category->name }}</a>
                         @endforeach
                     </div>
                 </details>
 
-                <a href="{{ route('shop.index') }}" class="block py-1">{{ content('header.nav_shop') }}</a>
                 @foreach($extraLinks as $link)
-                    <a href="{{ $link['url'] }}" class="block py-1">{{ $link['label'] }}</a>
+                    <a href="{{ $link['url'] }}" class="flex items-center py-3 border-b border-white/10">{{ $link['label'] }}</a>
                 @endforeach
-                <a href="{{ route('contact.show') }}" class="block py-1">{{ content('header.nav_contact') }}</a>
+                <a href="{{ route('contact.show') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_contact') }}</a>
 
-                <div class="mt-3 flex flex-wrap items-center gap-4 border-t border-white/10 pt-3 text-sm">
+                <div class="grid {{ [1 => 'grid-cols-1', 2 => 'grid-cols-2', 3 => 'grid-cols-3'][1 + (int) $showMyOrders + (int) $showWishlist] }} gap-2 py-3 text-xs text-center">
                     @if($showMyOrders)
-                        <a href="{{ route('orders.index') }}">📦 {{ content('header.nav_my_orders') }}</a>
+                        <a href="{{ route('orders.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                            <x-store-icon name="box" class="w-5 h-5"/> {{ content('header.nav_my_orders') }}
+                        </a>
                     @endif
                     @if($showWishlist)
-                        <a href="{{ route('wishlist.index') }}">❤️ {{ content('header.nav_wishlist') }} (<span id="wishlist-count-mobile">{{ $wishlistCount }}</span>)</a>
+                        <a href="{{ route('wishlist.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                            <x-store-icon name="heart" class="w-5 h-5"/>
+                            <span>{{ content('header.nav_wishlist') }} (<span id="wishlist-count-mobile" data-wishlist-count>{{ $wishlistCount }}</span>)</span>
+                        </a>
                     @endif
-                    <a href="{{ route('cart.index') }}">🛒 {{ content('header.nav_cart') }} (<span id="cart-count-mobile">{{ $cartCount }}</span>)</a>
+                    <a href="{{ route('cart.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                        <x-store-icon name="cart" class="w-5 h-5"/>
+                        <span>{{ content('header.nav_cart') }} (<span id="cart-count-mobile" data-cart-count>{{ $cartCount }}</span>)</span>
+                    </a>
                 </div>
-            </div>
+
+                @if($settings->contact_phone)
+                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $settings->contact_phone) }}"
+                       class="mb-2 flex items-center justify-center gap-2 rounded-md bg-accent text-on-accent font-semibold py-2.5 text-sm">
+                        <x-store-icon name="phone" class="w-4 h-4"/> {{ $settings->contact_phone }}
+                    </a>
+                @endif
+            </nav>
         </div>
 
         {{-- Desktop main menu --}}
@@ -2671,9 +2912,9 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 
     {{-- Footer --}}
     <footer class="bg-brand text-gray-300 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 sm:grid-cols-2 {{ $footerPages->isNotEmpty() ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 {{ $footerPages->isNotEmpty() ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-x-6 gap-y-8">
             {{-- About --}}
-            <div>
+            <div class="col-span-2 lg:col-span-1">
                 <div class="flex items-center gap-2 mb-3">
                     @if($logoUrl)
                         <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-10 w-auto max-w-[160px] object-contain">
@@ -2727,7 +2968,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
             @endif
 
             {{-- Contact (from Store settings) --}}
-            <div>
+            <div class="col-span-2 lg:col-span-1">
                 <h3 class="font-semibold text-sm uppercase tracking-wide mb-3 text-white">{{ content('footer.contact_heading') }}</h3>
                 <ul class="space-y-2 text-sm">
                     @if($settings->contact_phone)
@@ -2818,7 +3059,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <span class="text-sm font-semibold">Rs {{ number_format((float) $order->subtotal) }}</span>
+                                    <span class="text-sm font-semibold">{{ rupees((float) $order->subtotal) }}</span>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $order->status->badgeClasses() }}">
                                         {{ $order->status->label() }}
                                     </span>
@@ -3005,15 +3246,15 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                                 @endif
                             </td>
                             <td class="py-2 px-3 text-center">{{ $item->quantity }}</td>
-                            <td class="py-2 px-3 text-right whitespace-nowrap">Rs {{ number_format((float) $item->unit_price) }}</td>
-                            <td class="py-2 pl-3 text-right whitespace-nowrap font-medium">Rs {{ number_format((float) $item->line_total) }}</td>
+                            <td class="py-2 px-3 text-right whitespace-nowrap">{{ rupees((float) $item->unit_price) }}</td>
+                            <td class="py-2 pl-3 text-right whitespace-nowrap font-medium">{{ rupees((float) $item->line_total) }}</td>
                         </tr>
                     @endforeach
                     </tbody>
                     <tfoot>
                     <tr class="border-t border-gray-200 font-semibold">
                         <td class="pt-3" colspan="3">Total (cash on delivery)</td>
-                        <td class="pt-3 text-right whitespace-nowrap">Rs {{ number_format((float) $order->subtotal) }}</td>
+                        <td class="pt-3 text-right whitespace-nowrap">{{ rupees((float) $order->subtotal) }}</td>
                     </tr>
                     </tfoot>
                 </table>
@@ -3108,152 +3349,73 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 --- FILE: resources/views/partials/product-card.blade.php ---
 
 @php
-    $wishlistSession = session('wishlist', []);
-    $isInWishlist = is_array($wishlistSession) && in_array($product->id, $wishlistSession);
+    use App\Support\Content;
 
-    // control whether the heart icon should show (default: true)
+    $wishlistSession  = session('wishlist', []);
+    $isInWishlist     = is_array($wishlistSession) && in_array($product->id, $wishlistSession);
     $showWishlistIcon = $showWishlistIcon ?? true;
+    $productUrl       = route('product.show', $product->slug);
+    $discount         = $product->discountPercent();
 @endphp
 
-<div class="group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden
-            transition-all hover:shadow-md hover:-translate-y-1 flex flex-col h-full">
-
-    {{-- Top bar: SALE + wishlist --}}
-    <div class="absolute inset-x-0 top-0 z-10 flex items-start justify-between px-2 pt-2 pointer-events-none">
-        <div>
-            @if($product->is_on_sale)
-                <span class="inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-auto">
-                    {{ \App\Support\Content::text('pages.sale_badge') }}
-                </span>
-            @endif
-        </div>
-
-        @if($showWishlistIcon)
-            <div class="pointer-events-auto">
-                <form
-                    action="{{ route('wishlist.add', $product) }}"
-                    method="POST"
-                    data-ajax="wishlist"
-                    data-product-id="{{ $product->id }}"
-                >
-                    @csrf
-                    <button
-                        type="submit"
-                        class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center text-xs hover:text-red-500 transition"
-                        aria-label="Add to wishlist"
-                    >
-                        @if($isInWishlist)
-                            <span class="wishlist-heart text-red-500">❤</span>
-                        @else
-                            <span class="wishlist-heart text-gray-400">♡</span>
-                        @endif
-                    </button>
-                </form>
-            </div>
-        @endif
-    </div>
-
-    {{-- Product image / placeholder --}}
-    <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-       class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center overflow-hidden">
-        <x-store-image :src="$product->imageUrl()" :alt="$product->name" class="w-full h-full object-contain"/>
-    </a>
-
-    {{-- Text content --}}
-    <div class="flex-1 p-4 pb-4 md:pb-10 flex flex-col space-y-2">
-        {{-- Company row – fixed min height so cards align even if no company --}}
-        <span class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold min-h-[1rem] block">
-            {{ optional($product->company)->name }}
+{{-- Product card: compact on phones (2 per row), always-visible "Add to cart" (works on touch screens) --}}
+<div class="group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full transition hover:shadow-md">
+    @if($discount)
+        <span class="absolute left-2 top-2 z-10 inline-flex items-center gap-1 bg-red-500 text-white text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full">
+            {{ Content::text('pages.sale_badge') }} −{{ $discount }}%
         </span>
+    @endif
 
-        {{-- Title --}}
-        <h3 class="text-sm font-semibold text-gray-800 leading-snug">
-            <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-               class="hover:text-slate-900">
-                {{ $product->name }}
-            </a>
-        </h3>
-
-        {{-- Price --}}
-        <div class="flex items-baseline gap-2">
-            @if($product->is_on_sale && $product->sale_price)
-                <span class="text-red-600 font-bold text-sm">
-                    Rs {{ number_format($product->sale_price, 0) }}
-                </span>
-                <span class="text-gray-400 line-through text-xs">
-                    Rs {{ number_format($product->price, 0) }}
-                </span>
-            @else
-                <span class="text-slate-900 font-bold text-sm">
-                    Rs {{ number_format($product->price, 0) }}
-                </span>
-            @endif
-        </div>
-
-        {{-- Short description – allowed to grow, but we still keep the CTA at the bottom --}}
-        @if($product->short_description)
-            <p class="text-xs text-gray-500">
-                {{ $product->short_description }}
-            </p>
-        @endif
-
-        {{-- This pushes everything above up and leaves space for the bottom action bar --}}
-        <div class="mt-auto"></div>
-    </div>
-
-    {{-- Desktop: hover action bar --}}
-    <div class="hidden md:flex absolute inset-x-0 bottom-0 bg-white border-t border-gray-200 px-3 py-2
-                items-center justify-between opacity-0 translate-y-3
-                group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-150">
-
-        {{-- Add to Cart --}}
-        <form
-            action="{{ route('cart.add', $product) }}"
-            method="POST"
-            data-ajax="cart"
-            data-product-id="{{ $product->id }}"
-        >
+    @if($showWishlistIcon)
+        <form action="{{ route('wishlist.add', $product) }}" method="POST" data-ajax="wishlist" data-product-id="{{ $product->id }}"
+              class="absolute right-2 top-2 z-10">
             @csrf
-            <input type="hidden" name="quantity" value="1">
-            <button
-                type="submit"
-                class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
-            >
-                🛒 <span>{{ \App\Support\Content::text('pages.add_to_cart') }}</span>
+            <button type="submit" aria-label="{{ $isInWishlist ? 'Remove from wishlist' : 'Add to wishlist' }}"
+                    class="w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center text-sm hover:text-red-500 transition">
+                @if($isInWishlist)
+                    <span class="wishlist-heart text-red-500">❤</span>
+                @else
+                    <span class="wishlist-heart text-gray-400">♡</span>
+                @endif
             </button>
         </form>
+    @endif
 
-        {{-- View Details --}}
-        <a
-            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-            class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
-        >
-            👁️ <span>Details</span>
-        </a>
-    </div>
+    <a href="{{ $productUrl }}" class="block aspect-square bg-white p-2 sm:p-3" tabindex="-1" aria-hidden="true">
+        <x-store-image :src="$product->imageUrl()" :alt="$product->name"
+                       class="w-full h-full object-contain transition duration-300 group-hover:scale-105"/>
+    </a>
 
-    {{-- Mobile: full-width buttons --}}
-    <div class="md:hidden px-4 pb-4 space-y-2">
-        <a
-            href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-            class="block w-full text-center text-xs font-semibold rounded-md bg-brand text-white py-2 hover:bg-brand/90"
-        >
-            View Details
-        </a>
+    <div class="flex-1 flex flex-col gap-1 px-3 pb-3 sm:px-4 sm:pb-4">
+        {{-- Brand line always takes its space so names line up across cards --}}
+        <span class="text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-500 font-semibold truncate min-h-[1.25em]">
+            {{ $product->company?->name }}
+        </span>
 
-        <form
-            action="{{ route('cart.add', $product) }}"
-            method="POST"
-            data-ajax="cart"
-            data-product-id="{{ $product->id }}"
-        >
+        <h3 class="text-[13px] sm:text-sm font-semibold text-gray-800 leading-snug line-clamp-2 min-h-[2.5em]">
+            <a href="{{ $productUrl }}" class="hover:text-accent-ink">{{ $product->name }}</a>
+        </h3>
+
+        <div class="flex flex-wrap items-baseline gap-x-2">
+            @if($product->isOnSale())
+                <span class="text-red-600 font-bold text-sm sm:text-base">{{ rupees($product->sale_price) }}</span>
+                <span class="text-gray-400 line-through text-[11px] sm:text-xs">{{ rupees($product->price) }}</span>
+            @else
+                <span class="text-slate-900 font-bold text-sm sm:text-base">{{ rupees($product->price) }}</span>
+            @endif
+        </div>
+
+        @if($product->short_description)
+            <p class="hidden sm:block text-xs text-gray-500 line-clamp-2">{{ $product->short_description }}</p>
+        @endif
+
+        <form action="{{ route('cart.add', $product) }}" method="POST" data-ajax="cart" data-product-id="{{ $product->id }}" class="mt-auto pt-2">
             @csrf
             <input type="hidden" name="quantity" value="1">
-            <button
-                type="submit"
-                class="w-full text-center text-xs font-semibold rounded-md border border-brand text-brand py-2 hover:bg-brand hover:text-white"
-            >
-                {{ \App\Support\Content::text('pages.add_to_cart') }}
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-brand text-white text-xs sm:text-sm font-semibold py-2 hover:bg-brand/90 transition">
+                <x-store-icon name="cart" class="w-4 h-4"/>
+                <span>{{ Content::text('pages.add_to_cart') }}</span>
             </button>
         </form>
     </div>
@@ -3271,7 +3433,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 <a href="{{ $link }}" class="text-xs text-accent-ink hover:underline">{{ content('home.section_view_all') }}</a>
             @endif
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 items-stretch">
             @foreach($products as $product)
                 @include('partials.product-card', ['product' => $product])
             @endforeach
@@ -3315,31 +3477,76 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
     {{-- Product main content --}}
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {{-- Left: image(s) --}}
+            {{-- Left: image gallery + full-screen viewer --}}
             <div>
                 @php
                     $images = $product->imageUrls('large');
                     $thumbs = $product->imageUrls('thumb');
                 @endphp
                 @if(count($images))
-                    <div x-data="{ active: @js($images[0]) }">
-                        <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
-                            <x-store-image :src="$images[0]" :alt="$product->name" :lazy="false" x-bind:src="active" class="w-full h-full object-contain"/>
+                    <div x-data="productGallery(@js($images))" x-on:keydown.window="onKey($event)">
+                        <div class="relative">
+                            <button type="button" x-on:click="openViewer()" aria-label="View larger image"
+                                    class="group block w-full bg-white border border-gray-200 rounded-lg h-72 sm:h-96 overflow-hidden cursor-zoom-in"
+                                    x-on:touchstart.passive="touchStart($event)" x-on:touchend="touchEnd($event)">
+                                <x-store-image :src="$images[0]" :alt="$product->name" :lazy="false" x-bind:src="images[index]"
+                                               class="w-full h-full object-contain p-2"/>
+                                <span class="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-[11px] px-2.5 py-1">
+                                    <x-store-icon name="search" class="w-3.5 h-3.5"/> Tap to zoom
+                                </span>
+                            </button>
+                            @if(count($images) > 1)
+                                <button type="button" x-on:click="prev()" aria-label="Previous image"
+                                        class="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center text-slate-800 hover:bg-white">
+                                    <x-store-icon name="arrow-left" class="w-4 h-4"/>
+                                </button>
+                                <button type="button" x-on:click="next()" aria-label="Next image"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center text-slate-800 hover:bg-white">
+                                    <x-store-icon name="arrow-left" class="w-4 h-4 rotate-180"/>
+                                </button>
+                            @endif
                         </div>
+
                         @if(count($images) > 1)
-                            <div class="flex flex-wrap gap-2">
+                            <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
                                 @foreach($images as $i => $image)
-                                    <button type="button" x-on:click="active = @js($image)"
-                                            class="w-16 h-16 rounded-md border overflow-hidden bg-white"
-                                            :class="active === @js($image) ? 'border-accent ring-2 ring-accent' : 'border-gray-200'">
-                                        <x-store-image :src="$thumbs[$i] ?? $image" :alt="$product->name" class="w-full h-full object-contain"/>
+                                    <button type="button" x-on:click="index = {{ $i }}" aria-label="Show image {{ $i + 1 }}"
+                                            class="flex-shrink-0 w-16 h-16 rounded-md border overflow-hidden bg-white"
+                                            :class="index === {{ $i }} ? 'border-accent ring-2 ring-accent' : 'border-gray-200'">
+                                        <x-store-image :src="$thumbs[$i] ?? $image" :alt="$product->name . ' – image ' . ($i + 1)" class="w-full h-full object-contain"/>
                                     </button>
                                 @endforeach
                             </div>
                         @endif
+
+                        {{-- Full-screen viewer --}}
+                        <div x-show="open" x-cloak x-transition.opacity role="dialog" aria-modal="true" aria-label="{{ $product->name }} images"
+                             class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+                             x-on:click.self="close()" x-on:touchstart.passive="touchStart($event)" x-on:touchend="touchEnd($event)">
+                            <img x-bind:src="images[index]" src="{{ $images[0] }}" alt="{{ $product->name }}"
+                                 data-fallback="{{ \App\Support\Content::placeholderUrl() }}"
+                                 class="max-h-[85vh] max-w-[94vw] object-contain select-none">
+
+                            <button type="button" x-on:click="close()" aria-label="Close"
+                                    class="absolute top-3 right-3 w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25">
+                                <x-store-icon name="close" class="w-6 h-6"/>
+                            </button>
+                            @if(count($images) > 1)
+                                <button type="button" x-on:click="prev()" aria-label="Previous image"
+                                        class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25">
+                                    <x-store-icon name="arrow-left" class="w-5 h-5"/>
+                                </button>
+                                <button type="button" x-on:click="next()" aria-label="Next image"
+                                        class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25">
+                                    <x-store-icon name="arrow-left" class="w-5 h-5 rotate-180"/>
+                                </button>
+                                <span class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/15 text-white text-xs px-3 py-1"
+                                      x-text="(index + 1) + ' / ' + images.length"></span>
+                            @endif
+                        </div>
                     </div>
                 @else
-                    <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
+                    <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center overflow-hidden">
                         <x-store-image :alt="$product->name" :lazy="false" class="w-full h-full object-contain"/>
                     </div>
                 @endif
@@ -3359,27 +3566,34 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 @endif
 
                 <div class="space-y-1">
-                    @if($product->is_on_sale && $product->sale_price)
-                        <div class="flex items-baseline gap-3">
-                            <span class="text-2xl font-bold text-red-600">
-                                Rs {{ number_format($product->sale_price, 2) }}
-                            </span>
-                            <span class="text-sm text-gray-400 line-through">
-                                Rs {{ number_format($product->price, 2) }}
+                    @if($product->isOnSale())
+                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span class="text-2xl font-bold text-red-600">{{ rupees($product->sale_price) }}</span>
+                            <span class="text-sm text-gray-400 line-through">{{ rupees($product->price) }}</span>
+                            <span class="inline-flex items-center rounded-full bg-red-500 text-white text-xs font-semibold px-2 py-0.5">
+                                Save {{ $product->discountPercent() }}%
                             </span>
                         </div>
                     @else
                         <div class="text-2xl font-bold text-slate-900">
-                            Rs {{ number_format($product->price, 2) }}
+                            {{ rupees($product->price) }}
                         </div>
                     @endif
 
-                    <div class="text-xs text-gray-500">
-                        @if($product->stock > 0)
-                            <span class="text-emerald-600 font-semibold">In Stock</span>
-                            <span> ({{ $product->stock }} available)</span>
+                    {{-- Orders are confirmed by phone, so "0 in stock" means "on order", not "can't buy" --}}
+                    <div class="text-sm">
+                        @if($product->stock >= 5)
+                            <span class="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                                <x-store-icon name="check" class="w-4 h-4"/> {{ \App\Support\Content::text('pages.stock_in') }}
+                            </span>
+                        @elseif($product->stock > 0)
+                            <span class="inline-flex items-center gap-1 text-amber-700 font-semibold">
+                                <x-store-icon name="clock" class="w-4 h-4"/> {{ \App\Support\Content::text('pages.stock_low', ['count' => $product->stock]) }}
+                            </span>
                         @else
-                            <span class="text-red-600 font-semibold">Out of Stock</span>
+                            <span class="inline-flex items-center gap-1 text-sky-700 font-semibold">
+                                <x-store-icon name="truck" class="w-4 h-4"/> {{ \App\Support\Content::text('pages.stock_on_order') }}
+                            </span>
                         @endif
                     </div>
 
@@ -3398,13 +3612,13 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                         <div class="flex flex-wrap gap-2">
                             <span class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border-2 border-accent bg-accent/10 text-xs font-semibold text-slate-900" aria-current="true">
                                 {{ $product->sizeLabel() }}
-                                <span class="font-normal text-gray-600">Rs {{ number_format($product->getDisplayPrice()) }}</span>
+                                <span class="font-normal text-gray-600">{{ rupees($product->getDisplayPrice()) }}</span>
                             </span>
                             @foreach($otherSizes as $size)
                                 <a href="{{ route('product.show', $size->slug) }}"
                                    class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border border-gray-300 bg-white text-xs font-semibold text-slate-800 hover:border-accent">
                                     {{ $size->sizeLabel() }}
-                                    <span class="font-normal text-gray-600">Rs {{ number_format($size->getDisplayPrice()) }}</span>
+                                    <span class="font-normal text-gray-600">{{ rupees($size->getDisplayPrice()) }}</span>
                                 </a>
                             @endforeach
                         </div>
@@ -3438,22 +3652,26 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                         >
                             @csrf
 
-                            <label for="detail-quantity-{{ $product->id }}" class="text-sm text-gray-700">
-                                Quantity:
-                            </label>
-                            <input
-                                id="detail-quantity-{{ $product->id }}"
-                                type="number"
-                                name="quantity"
-                                value="1"
-                                min="1"
-                                class="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                            >
+                            <label for="detail-quantity-{{ $product->id }}" class="sr-only">Quantity</label>
+                            <div class="inline-flex items-stretch rounded-md border border-gray-300 bg-white overflow-hidden" x-data="{ q: 1 }">
+                                <button type="button" x-on:click="q = Math.max(1, q - 1)" aria-label="Decrease quantity"
+                                        class="w-10 flex items-center justify-center text-gray-600 hover:bg-gray-100">
+                                    <x-store-icon name="minus" class="w-4 h-4"/>
+                                </button>
+                                <input id="detail-quantity-{{ $product->id }}" type="number" name="quantity" x-model.number="q"
+                                       value="1" min="1" max="{{ \App\Support\Cart::MAX_LINE_QUANTITY }}" inputmode="numeric"
+                                       class="w-14 border-0 border-x border-gray-300 text-center text-sm focus:ring-2 focus:ring-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none">
+                                <button type="button" x-on:click="q = Math.min({{ \App\Support\Cart::MAX_LINE_QUANTITY }}, q + 1)" aria-label="Increase quantity"
+                                        class="w-10 flex items-center justify-center text-gray-600 hover:bg-gray-100">
+                                    <x-store-icon name="plus" class="w-4 h-4"/>
+                                </button>
+                            </div>
 
                             <button
                                 type="submit"
-                                class="inline-flex items-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
+                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
                             >
+                                <x-store-icon name="cart" class="w-4 h-4"/>
                                 {{ \App\Support\Content::text('pages.add_to_cart') }}
                             </button>
                         </form>
@@ -3508,7 +3726,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
     @if($related->isNotEmpty())
         <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
             <h2 class="text-lg font-semibold mb-4">Related Products</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
                 @foreach($related as $product)
                     @include('partials.product-card', ['product' => $product])
                 @endforeach
@@ -3548,6 +3766,11 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 
     <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-white border border-gray-100 rounded-lg p-5 sm:p-6">
+            @if($errors->any() && ! $errors->has('form'))
+            <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+            </div>
+            @endif
             @if($errors->has('form'))
                 <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ $errors->first('form') }}</div>
             @endif
@@ -3563,13 +3786,13 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label for="name" class="{{ $label }}">Your name <span class="text-red-500">*</span></label>
-                        <input id="name" name="name" value="{{ old('name') }}" required maxlength="100" autocomplete="name" class="{{ $input }}">
-                        @error('name')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="name" name="name" value="{{ old('name') }}" required maxlength="100" autocomplete="name" @error('name') aria-invalid="true" aria-describedby="name-error" @enderror class="{{ $input }} @error('name') !border-red-500 bg-red-50/40 @enderror">
+                        @error('name')<p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="phone" class="{{ $label }}">Mobile / WhatsApp number <span class="text-red-500">*</span></label>
-                        <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required maxlength="25" inputmode="tel" autocomplete="tel" placeholder="0300 1234567" class="{{ $input }}">
-                        @error('phone')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required maxlength="25" inputmode="tel" autocomplete="tel" placeholder="0300 1234567" @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror class="{{ $input }} @error('phone') !border-red-500 bg-red-50/40 @enderror">
+                        @error('phone')<p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="business_name" class="{{ $label }}">Business / company name <span class="text-gray-400 font-normal">(optional)</span></label>
@@ -3581,23 +3804,24 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                     </div>
                     <div class="sm:col-span-2">
                         <label for="email" class="{{ $label }}">Email <span class="text-gray-400 font-normal">(optional)</span></label>
-                        <input id="email" type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" class="{{ $input }}">
-                        @error('email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" @error('email') aria-invalid="true" aria-describedby="email-error" @enderror class="{{ $input }} @error('email') !border-red-500 bg-red-50/40 @enderror">
+                        @error('email')<p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>
 
                 <div>
                     <label for="items" class="{{ $label }}">{{ Content::text('pages.quote_items_label') }}</label>
-                    <textarea id="items" name="items" rows="6" maxlength="5000" placeholder="{{ content('pages.quote_items_placeholder') }}" class="{{ $input }}">{{ old('items') }}</textarea>
-                    @error('items')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    <textarea id="items" name="items" rows="6" maxlength="5000" placeholder="{{ content('pages.quote_items_placeholder') }}" @error('items') aria-invalid="true" aria-describedby="items-error" @enderror class="{{ $input }} @error('items') !border-red-500 bg-red-50/40 @enderror">{{ old('items') }}</textarea>
+                    @error('items')<p id="items-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
 
                 <div>
                     <label for="attachment" class="{{ $label }}">{{ Content::text('pages.quote_attachment_label') }}</label>
                     <input id="attachment" type="file" name="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf"
-                           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand file:text-white file:text-sm">
+                           @error('attachment') aria-invalid="true" aria-describedby="attachment-error" @enderror
+                           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand file:text-white file:text-sm @error('attachment') !border-red-500 bg-red-50/40 @enderror">
                     <p class="mt-1 text-[11px] text-gray-500">JPG, PNG, WebP or PDF, up to 10 MB.</p>
-                    @error('attachment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    @error('attachment')<p id="attachment-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
 
                 @if($cartItems->isNotEmpty())
@@ -3617,7 +3841,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 @if(config('orders.turnstile.site_key'))
                     <div>
                         <div class="cf-turnstile" data-sitekey="{{ config('orders.turnstile.site_key') }}"></div>
-                        @error('cf-turnstile-response')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        @error('cf-turnstile-response')<p id="cf-turnstile-response-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 @endif
 
@@ -3681,11 +3905,30 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 @endsection
 
 
+--- FILE: resources/views/search/partials/browse-categories.blade.php ---
+
+@if($categories->isNotEmpty())
+    <div class="mt-5 text-left">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Or browse a category</p>
+        <div class="flex flex-wrap gap-2">
+            @foreach($categories as $category)
+                <a href="{{ route('category.show', $category->slug) }}"
+                   class="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-accent hover:text-accent-ink">
+                    {{ $category->name }}
+                </a>
+            @endforeach
+        </div>
+    </div>
+@endif
+
+
 --- FILE: resources/views/search/results.blade.php ---
 
 @extends('layouts.frontend')
 
-@section('title', 'Search' . \App\Support\Content::text('seo.title_suffix'))
+@php use App\Support\Content; @endphp
+
+@section('title', ($query ? '“' . $query . '” – ' : '') . 'Search' . Content::text('seo.title_suffix'))
 
 @push('meta')
     <meta name="robots" content="noindex, follow">
@@ -3694,43 +3937,62 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 @section('content')
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-2xl font-bold mb-2">Search</h1>
-            <p class="text-sm text-gray-300">
-                @if($query)
-                    Results for: <span class="font-semibold">“{{ $query }}”</span>
-                @else
-                    Enter a term in the search box to find products.
-                @endif
-            </p>
+            <h1 class="text-2xl font-bold mb-3">Search</h1>
+
+            {{-- Search box on the page itself (the header search is hidden behind an icon on phones) --}}
+            <form action="{{ route('search') }}" method="GET" role="search" class="flex gap-2 max-w-2xl">
+                <input type="search" name="q" value="{{ $query }}" placeholder="{{ content('header.search_placeholder') }}"
+                       aria-label="{{ content('header.search_placeholder') }}" @if($query === '') autofocus @endif
+                       class="flex-1 min-w-0 rounded-md border border-white/20 bg-white/10 px-3 py-2.5 text-base placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-accent">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-accent text-on-accent text-sm font-semibold hover:bg-accent/80">
+                    <x-store-icon name="search" class="w-4 h-4"/> <span class="hidden sm:inline">Search</span>
+                </button>
+            </form>
         </div>
     </section>
 
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        @if(!$query)
-            <p class="text-sm text-gray-600">
-                Use the search bar in the header to look for products by name or description.
-            </p>
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        @if($query === '')
+            <div class="bg-white border border-gray-200 rounded-lg p-6">
+                <p class="text-sm text-gray-700">Type a product name, size or brand – for example <em>2.5mm wire</em>, <em>LED bulb</em> or a brand name.</p>
+                @include('search.partials.browse-categories')
+            </div>
+        @elseif($products->isEmpty())
+            <div class="bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <x-store-icon name="search" class="w-10 h-10 mx-auto text-gray-300"/>
+                <p class="mt-3 text-sm font-medium text-gray-800">{{ Content::text('pages.search_empty') }}</p>
+                <p class="mt-1 text-xs text-gray-500">Check the spelling, try fewer words, or ask us – we may have it in the shop.</p>
+                <div class="mt-4 flex flex-wrap justify-center gap-2">
+                    @php
+                        $askWhatsApp = \App\Models\SiteSetting::current()->whatsappLink('Assalam o Alaikum, do you have: ' . $query . '?');
+                    @endphp
+                    @if($askWhatsApp)
+                        <a href="{{ $askWhatsApp }}" target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                            <x-store-icon name="whatsapp" class="w-4 h-4"/> Ask on WhatsApp
+                        </a>
+                    @endif
+                    <a href="{{ route('quotes.create') }}" class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">
+                        Request a quote
+                    </a>
+                </div>
+                @include('search.partials.browse-categories')
+            </div>
         @else
-            @if($products->isEmpty())
-                <p class="text-sm text-gray-600">
-                    {{ \App\Support\Content::text('pages.search_empty') }}
-                </p>
-            @else
-                <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-                    <p class="text-sm text-gray-600">
-                        Found {{ $products->total() }} product(s).
-                    </p>
-                </div>
+            <p class="mb-4 text-sm text-gray-600">
+                <span class="font-semibold text-slate-900">{{ $products->total() }}</span>
+                {{ \Illuminate\Support\Str::plural('result', $products->total()) }} for <span class="font-semibold text-slate-900">“{{ $query }}”</span>
+            </p>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-                    @foreach($products as $product)
-                        @include('partials.product-card', ['product' => $product])
-                    @endforeach
-                </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 items-stretch">
+                @foreach($products as $product)
+                    @include('partials.product-card', ['product' => $product])
+                @endforeach
+            </div>
 
-
-                {{ $products->links() }}
-            @endif
+            <div class="mt-6">
+                {{ $products->onEachSide(1)->links() }}
+            </div>
         @endif
     </section>
 @endsection
@@ -3812,7 +4074,8 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 @if($crumbs)
                     <nav class="text-xs text-gray-400 mb-1" aria-label="Breadcrumb">
                         @foreach(array_slice($crumbs, 0, -1) as [$label, $url])
-                            <a href="{{ $url }}" class="hover:text-accent">{{ $label }}</a> /
+                            @if(! $loop->first) <span aria-hidden="true">/</span> @endif
+                            <a href="{{ $url }}" class="hover:text-accent">{{ $label }}</a>
                         @endforeach
                     </nav>
                 @endif
@@ -3831,63 +4094,109 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
         </div>
     </section>
 
+    @php
+        // Active filters → removable chips ("Wires ✕", "On sale ✕" …). Category pages pre-select their own
+        // category, so category chips are only shown on the plain shop page.
+        $query = collect(request()->query())->except(['page'])->all();
+
+        $without = function (string $key, $value = null) use ($query, $filterAction) {
+            $q = $query;
+            if ($value === null) {
+                unset($q[$key]);
+            } else {
+                $q[$key] = array_values(array_diff((array) ($q[$key] ?? []), [(string) $value, (int) $value]));
+                if (! $q[$key]) {
+                    unset($q[$key]);
+                }
+            }
+            return $filterAction . ($q ? '?' . http_build_query($q) : '');
+        };
+
+        $chips = [];
+        if (! $currentCategory) {
+            foreach ($categories->whereIn('id', $selectedCategories) as $cat) {
+                $chips[] = [$cat->name, $without('categories', $cat->id)];
+            }
+        }
+        if (! $currentBrand) {
+            $companyNames = collect($categoryCompanies)->flatten(1)->pluck('name', 'id');
+            foreach ($selectedCompanies as $companyId) {
+                if ($companyNames->has((int) $companyId)) {
+                    $chips[] = [$companyNames[(int) $companyId], $without('companies', $companyId)];
+                }
+            }
+        }
+        if ($onSale) {
+            $chips[] = ['On sale', $without('on_sale')];
+        }
+        if ($currentMin > $minPrice || $currentMax < $maxPrice) {
+            $chips[] = [rupees($currentMin) . ' – ' . number_format($currentMax), $filterAction . '?' . http_build_query(collect($query)->except(['min_price', 'max_price'])->all())];
+        }
+
+        $sortOptions = [
+            'default'        => 'Name (A–Z)',
+            'latest'         => 'Newest first',
+            'price_low_high' => 'Price: low to high',
+            'price_high_low' => 'Price: high to low',
+        ];
+    @endphp
+
     {{-- Filters + products --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {{-- Sidebar filters form --}}
-            <aside class="md:col-span-1">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8" x-data="{ filtersOpen: false }">
+        {{-- Phone: filter toggle + sort --}}
+        <div class="md:hidden flex items-center gap-2 mb-4">
+            <button type="button" x-on:click="filtersOpen = ! filtersOpen" :aria-expanded="filtersOpen"
+                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800">
+                <x-store-icon name="filter" class="w-4 h-4"/>
+                <span x-text="filtersOpen ? 'Hide filters' : 'Filters'">Filters</span>
+                @if(count($chips))
+                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-accent text-on-accent text-[11px] font-bold">{{ count($chips) }}</span>
+                @endif
+            </button>
+            <label class="sr-only" for="sort-mobile">Sort</label>
+            <select id="sort-mobile" name="sort" form="shop-filters-form" data-sync-submit
+                    class="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent">
+                @foreach($sortOptions as $value => $label)
+                    <option value="{{ $value }}" @selected($sort === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8">
+            {{-- Filters (sidebar on desktop, collapsible on phones) --}}
+            <aside class="md:col-span-1 hidden md:block" :class="{ '!block': filtersOpen }">
                 <form
                     id="shop-filters-form"
                     method="GET"
                     action="{{ $filterAction }}"
-                    class="bg-white border border-gray-200 rounded-xl px-4 py-5 space-y-6 shadow-sm"
+                    class="bg-white border border-gray-200 rounded-xl px-4 py-5 space-y-6 shadow-sm md:sticky md:top-4"
+                    data-shop-filters
                 >
-                    {{-- SHOP BY CATEGORIES + nested companies --}}
+                    {{-- Categories + nested brands --}}
                     <div>
-                        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">
-                            Shop by Categories
-                        </h2>
+                        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Categories</h2>
 
-                        <div class="space-y-2 text-sm text-gray-700">
+                        <div class="space-y-1.5 text-sm text-gray-700">
                             @foreach($categories as $category)
-                                {{-- Top-level category row --}}
-                                <label class="flex items-center gap-2 cursor-pointer hover:text-accent-ink">
-                                    <input
-                                        type="checkbox"
-                                        name="categories[]"
-                                        value="{{ $category->id }}"
-                                        class="w-4 h-4 border-gray-300 rounded category-checkbox"
-                                        data-category-id="{{ $category->id }}"
-                                        {{ in_array($category->id, $selectedCategories) ? 'checked' : '' }}
-                                    >
-                                    <span>
-                                    {{ $category->name }}
-                                    <span class="text-xs text-gray-500">
-                                        ({{ $category->products_count }})
-                                    </span>
-                                </span>
+                                <label class="flex items-center gap-2 cursor-pointer py-0.5 hover:text-accent-ink">
+                                    <input type="checkbox" name="categories[]" value="{{ $category->id }}"
+                                           class="w-4 h-4 border-gray-300 rounded text-brand focus:ring-accent category-checkbox"
+                                           data-category-id="{{ $category->id }}"
+                                           @checked(in_array($category->id, $selectedCategories))>
+                                    <span class="flex-1">{{ $category->name }}</span>
+                                    <span class="text-xs text-gray-400">{{ $category->products_count }}</span>
                                 </label>
 
-                                {{-- Nested companies under this category, if any --}}
-                                @if(!empty($categoryCompanies[$category->id]))
-                                    <div class="mt-1 mb-1 space-y-1 text-xs text-gray-600 pl-6">
+                                @if(! empty($categoryCompanies[$category->id]))
+                                    <div class="space-y-1 text-xs text-gray-600 pl-6">
                                         @foreach($categoryCompanies[$category->id] as $company)
-                                            <label class="flex items-center gap-2 cursor-pointer hover:text-accent-ink">
-                                                <span class="text-gray-400 text-sm leading-none">›</span>
-                                                <input
-                                                    type="checkbox"
-                                                    name="companies[]"
-                                                    value="{{ $company['id'] }}"
-                                                    class="w-3 h-3 border-gray-300 rounded company-checkbox"
-                                                    data-category-id="{{ $category->id }}"
-                                                    {{ in_array($company['id'], $selectedCompanies) ? 'checked' : '' }}
-                                                >
-                                                <span>
-                                                {{ $company['name'] }}
-                                                <span class="text-[11px] text-gray-400">
-                                                    ({{ $company['count'] }})
-                                                </span>
-                                            </span>
+                                            <label class="flex items-center gap-2 cursor-pointer py-0.5 hover:text-accent-ink">
+                                                <input type="checkbox" name="companies[]" value="{{ $company['id'] }}"
+                                                       class="w-3.5 h-3.5 border-gray-300 rounded text-brand focus:ring-accent company-checkbox"
+                                                       data-category-id="{{ $category->id }}"
+                                                       @checked(in_array($company['id'], $selectedCompanies))>
+                                                <span class="flex-1">{{ $company['name'] }}</span>
+                                                <span class="text-[11px] text-gray-400">{{ $company['count'] }}</span>
                                             </label>
                                         @endforeach
                                     </div>
@@ -3896,150 +4205,119 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                         </div>
                     </div>
 
-                    {{-- OTHER FILTERS (on sale) --}}
-                    <div>
-                        <hr class="border-gray-200 mt-2 mb-1">
-
-                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-                            Other Filters
-                        </h3>
-
+                    {{-- On sale --}}
+                    <div class="border-t border-gray-100 pt-4">
                         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                name="on_sale"
-                                value="1"
-                                class="w-4 h-4 border-gray-300 rounded"
-                                {{ $onSale ? 'checked' : '' }}
-                            >
-                            <span>Show only products on sale</span>
+                            <input type="checkbox" name="on_sale" value="1" class="w-4 h-4 border-gray-300 rounded text-brand focus:ring-accent" @checked($onSale)>
+                            <span>Only products on sale</span>
                         </label>
                     </div>
 
-                    {{-- PRICE with slider --}}
-                    <div>
-                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">
-                            Price
-                        </h3>
-
-                        <div class="px-2">
-                            <div
-                                id="price-slider"
-                                class="mb-3"
-                                data-min="{{ $minPrice }}"
-                                data-max="{{ $maxPrice }}"
-                                data-current-min="{{ $currentMin }}"
-                                data-current-max="{{ $currentMax }}"
-                            ></div>
+                    {{-- Price --}}
+                    @if($maxPrice > $minPrice)
+                        <div class="border-t border-gray-100 pt-4">
+                            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-4">Price</h3>
+                            <div class="px-2">
+                                <div id="price-slider" class="mb-3"
+                                     data-min="{{ $minPrice }}" data-max="{{ $maxPrice }}"
+                                     data-current-min="{{ $currentMin }}" data-current-max="{{ $currentMax }}"></div>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                Rs <span id="price-min-label">{{ number_format($currentMin) }}</span>
+                                – Rs <span id="price-max-label">{{ number_format($currentMax) }}</span>
+                            </p>
+                            <input type="hidden" name="min_price" id="min_price_input" value="{{ $currentMin }}">
+                            <input type="hidden" name="max_price" id="max_price_input" value="{{ $currentMax }}">
                         </div>
+                    @endif
 
-
-                        <p class="text-[11px] text-gray-500">
-                            Price: Rs <span id="price-min-label">{{ number_format($currentMin, 0) }}</span>
-                            – Rs <span id="price-max-label">{{ number_format($currentMax, 0) }}</span>
-                        </p>
-
-                        {{-- Hidden inputs submitted with this form --}}
-                        <input type="hidden" name="min_price" id="min_price_input" value="{{ $currentMin }}">
-                        <input type="hidden" name="max_price" id="max_price_input" value="{{ $currentMax }}">
-
-                        <button
-                            type="submit"
-                            class="mt-3 inline-flex items-center px-4 py-1.5 rounded-md bg-accent text-on-accent text-xs font-semibold hover:bg-accent/80 shadow-sm"
-                        >
-                            Filter
+                    <div class="flex items-center gap-2 border-t border-gray-100 pt-4">
+                        <button type="submit"
+                                class="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-md bg-accent text-on-accent text-sm font-semibold hover:bg-accent/80 shadow-sm">
+                            Apply filters
                         </button>
+                        @if(count($chips))
+                            <a href="{{ $filterAction }}" class="px-3 py-2.5 text-sm text-gray-600 hover:text-red-600">Clear</a>
+                        @endif
                     </div>
                 </form>
             </aside>
 
-            {{-- Products + top controls (NOT in the form) --}}
+            {{-- Products --}}
             <div class="md:col-span-3 space-y-4">
-                {{-- Top controls --}}
-                <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
-                    <div class="text-sm text-gray-600">
+                {{-- Toolbar --}}
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">
+                    <p class="text-sm text-gray-600">
                         @if($products->total() > 0)
-                            Showing {{ $products->firstItem() }}–{{ $products->lastItem() }}
-                            of {{ $products->total() }} product(s)
+                            <span class="font-semibold text-slate-900">{{ $products->total() }}</span> {{ \Illuminate\Support\Str::plural('product', $products->total()) }}
+                            @if($products->lastPage() > 1)
+                                <span class="text-gray-400">· showing {{ $products->firstItem() }}–{{ $products->lastItem() }}</span>
+                            @endif
                         @else
-                            {{ \App\Support\Content::text('pages.shop_empty') }}
+                            <span class="font-semibold text-slate-900">0</span> products
                         @endif
-                    </div>
+                    </p>
 
-                    <div class="flex flex-wrap items-center gap-4 text-sm">
-                        {{-- Show per page --}}
-                        <div class="flex items-center gap-2">
-                            <span class="text-gray-600 text-xs uppercase tracking-wide">Show</span>
-                            <div class="relative">
-                                <select
-                                    name="per_page"
-                                    form="shop-filters-form"
-                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                                    onchange="this.form.submit()"
-                                >
-                                    @foreach([12, 20, 40, 60] as $size)
-                                        <option value="{{ $size }}" {{ $perPage == $size ? 'selected' : '' }}>
-                                            {{ $size }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-400 text-xs">
-                                ▾
-                            </span>
-                            </div>
-                        </div>
-
-                        {{-- Sort --}}
-                        <div class="flex items-center gap-2">
-                            <span class="sr-only">Sort</span>
-                            <div class="relative">
-                                <select
-                                    name="sort"
-                                    form="shop-filters-form"
-                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                                    onchange="this.form.submit()"
-                                >
-                                    <option value="default" {{ $sort === 'default' ? 'selected' : '' }}>
-                                        Default sorting
-                                    </option>
-                                    <option value="latest" {{ $sort === 'latest' ? 'selected' : '' }}>
-                                        Sort by latest
-                                    </option>
-                                    <option value="price_low_high" {{ $sort === 'price_low_high' ? 'selected' : '' }}>
-                                        Sort by price: low to high
-                                    </option>
-                                    <option value="price_high_low" {{ $sort === 'price_high_low' ? 'selected' : '' }}>
-                                        Sort by price: high to low
-                                    </option>
-                                </select>
-                                <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-400 text-xs">
-                                ▾
-                            </span>
-                            </div>
-                        </div>
+                    <div class="hidden md:flex items-center gap-3 text-sm">
+                        <label class="flex items-center gap-2 text-xs text-gray-500">
+                            Sort
+                            <select name="sort" form="shop-filters-form" data-sync-submit
+                                    class="border border-gray-300 rounded-md pl-3 pr-8 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent">
+                                @foreach($sortOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected($sort === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-gray-500">
+                            Show
+                            <select name="per_page" form="shop-filters-form" data-sync-submit
+                                    class="border border-gray-300 rounded-md pl-3 pr-8 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent">
+                                @foreach([12, 20, 40, 60] as $size)
+                                    <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }}</option>
+                                @endforeach
+                            </select>
+                        </label>
                     </div>
                 </div>
 
-                {{-- Product grid --}}
+                {{-- Active filter chips --}}
+                @if(count($chips))
+                    <div class="flex flex-wrap items-center gap-2">
+                        @foreach($chips as [$label, $removeUrl])
+                            <a href="{{ $removeUrl }}"
+                               class="inline-flex items-center gap-1.5 rounded-full border border-accent/50 bg-accent/10 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-accent/20">
+                                {{ $label }}
+                                <x-store-icon name="close" class="w-3 h-3" aria-label="Remove"/>
+                            </a>
+                        @endforeach
+                        <a href="{{ $filterAction }}" class="text-xs text-gray-500 hover:text-red-600 underline ml-1">Clear all</a>
+                    </div>
+                @endif
+
                 @if($products->isEmpty())
-                    <p class="text-sm text-gray-600">
-                        Try adjusting your filters or selecting different categories.
-                    </p>
+                    <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                        <x-store-icon name="search" class="w-10 h-10 mx-auto text-gray-300"/>
+                        <p class="mt-3 text-sm text-gray-700">{{ \App\Support\Content::text('pages.shop_empty') }}</p>
+                        <p class="mt-1 text-xs text-gray-500">Try removing a filter, or ask us on WhatsApp – we may have it in the shop.</p>
+                        <div class="mt-4 flex flex-wrap justify-center gap-2">
+                            <a href="{{ $filterAction }}" class="inline-flex items-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">Clear filters</a>
+                            <a href="{{ route('quotes.create') }}" class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white">Request a quote</a>
+                        </div>
+                    </div>
                 @else
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
                         @foreach($products as $product)
                             @include('partials.product-card', ['product' => $product])
                         @endforeach
                     </div>
 
                     <div class="mt-6">
-                        {{ $products->links() }}
+                        {{ $products->onEachSide(1)->links() }}
                     </div>
                 @endif
             </div>
         </div>
     </section>
-
 @endsection
 
 
@@ -4099,7 +4377,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
                 </form>
             </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 items-stretch">
                 @foreach($products as $product)
                     <div class="relative">
                         {{-- Your existing remove-from-wishlist X button at top-right --}}
@@ -4919,6 +5197,18 @@ class Product extends Model
             ->map(fn (string $path) => ImageVariants::url($path, $size))
             ->values()
             ->all();
+    }
+
+    // On sale = flagged AND has a sale price (same rule as getDisplayPrice())
+    public function isOnSale(): bool
+    {
+        return $this->is_on_sale && (float) $this->sale_price > 0 && (float) $this->sale_price < (float) $this->price;
+    }
+
+    // "12" for a 12% discount, null when not on sale
+    public function discountPercent(): ?int
+    {
+        return $this->isOnSale() ? (int) round((1 - (float) $this->sale_price / (float) $this->price) * 100) : null;
     }
 
     // SQL version of getDisplayPrice() for whereBetween / orderBy / min / max
