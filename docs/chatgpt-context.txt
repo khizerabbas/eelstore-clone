@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CspReportController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
@@ -62,6 +63,11 @@ Route::get('/bulk-quote/thank-you', [QuoteController::class, 'thanks'])->name('q
 Route::post('/client-errors', [ClientErrorController::class, 'store'])
     ->middleware('throttle:' . config('errorlog.browser_reports_per_minute', 20) . ',1')
     ->name('client-errors.store');
+
+// Content-Security-Policy violation reports from browsers (CSRF-exempt)
+Route::post('/csp-report', [CspReportController::class, 'store'])
+    ->middleware('throttle:30,1')
+    ->name('csp-report');
 
 // CMS pages managed in the admin (Website → Content pages)
 Route::get('/pages/{slug}', [PageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');
@@ -204,6 +210,7 @@ class CartController extends Controller
                 'success'    => true,
                 'message'    => 'Product added to cart',
                 'cart_count' => $cartCount,
+                'product'    => ['id' => $product->id, 'name' => $product->name, 'price' => $product->getDisplayPrice(), 'quantity' => $quantity],
             ]);
         }
 
@@ -432,7 +439,7 @@ class ContactController extends Controller
         }, $validated);
 
         $settings = SiteSetting::current();
-        $recipient = $settings->contact_recipient_email ?: 'test@test.com';
+        $recipient = $settings->contact_recipient_email ?: config('orders.admin_email');
 
         // Save to DB (using sanitized values)
         $contactMessage = ContactMessage::create([
@@ -446,11 +453,14 @@ class ContactController extends Controller
         ]);
 
         // Send email (safe, escaped output in the mailable view)
-        try {
-            Mail::to($recipient)->send(new \App\Mail\ContactFormSubmitted($contactMessage));
-        } catch (\Throwable $e) {
-            // log error, but don't expose details to user
-            // logger($e->getMessage());
+        // The message is saved either way (Admin → Contact messages); email is a bonus.
+        // Failures are reported (Error log) but never shown to the visitor.
+        if ($recipient) {
+            try {
+                Mail::to($recipient)->send(new \App\Mail\ContactFormSubmitted($contactMessage));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return back()->with('success', 'Thank you for contacting us. We will get back to you soon.');
@@ -467,6 +477,56 @@ namespace App\Http\Controllers;
 abstract class Controller
 {
     //
+}
+
+
+--- FILE: app/Http/Controllers/CspReportController.php ---
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Support\ErrorRecorder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+// Receives Content-Security-Policy violation reports from browsers → Error log (warning)
+class CspReportController extends Controller
+{
+    public function store(Request $request)
+    {
+        $payload = json_decode((string) $request->getContent(), true);
+
+        // Old format: {"csp-report": {...}} – Reporting API: [{"type": "csp-violation", "body": {...}}]
+        $reports = isset($payload['csp-report'])
+            ? [$payload['csp-report']]
+            : collect(is_array($payload) ? $payload : [])->where('type', 'csp-violation')->pluck('body')->all();
+
+        foreach (array_slice($reports, 0, 5) as $report) {
+            if (! is_array($report)) {
+                continue;
+            }
+
+            $blocked   = (string) ($report['blocked-uri'] ?? $report['blockedURL'] ?? '');
+            $directive = (string) ($report['effective-directive'] ?? $report['violated-directive'] ?? $report['effectiveDirective'] ?? '');
+
+            // Browser extensions inject their own code – not something the site can fix
+            if (preg_match('/^(chrome|moz|safari|ms-browser)-extension|^about:/i', $blocked)) {
+                continue;
+            }
+
+            ErrorRecorder::browser([
+                'type'    => 'CSP violation',
+                'level'   => 'warning',
+                'message' => Str::limit("Blocked {$blocked} ({$directive})", 500),
+                'page'    => Str::limit((string) ($report['document-uri'] ?? $report['documentURL'] ?? ''), 2000, ''),
+                'source'  => (string) ($report['source-file'] ?? $report['sourceFile'] ?? ''),
+                'line'    => $report['line-number'] ?? $report['lineNumber'] ?? null,
+            ]);
+        }
+
+        return response()->noContent();
+    }
 }
 
 
@@ -639,6 +699,7 @@ class PageController extends Controller
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Support\ProductSearch;
 use App\Models\Category;
 use App\Models\Company;
 use Illuminate\Http\Request;
@@ -867,12 +928,11 @@ class ProductController extends Controller
             $productsQuery = Product::with(['category', 'company'])
                 ->where('is_active', true);
 
+            // Forgiving matching: "2.5mm" ↔ "2.5 mm", any word order, brand/category/SKU too (see ProductSearch)
             if ($queryText !== '') {
-                $productsQuery->where(function ($q) use ($queryText) {
-                    $q->where('name', 'like', "%{$queryText}%")
-                        ->orWhere('short_description', 'like', "%{$queryText}%")
-                        ->orWhere('description', 'like', "%{$queryText}%");
-                });
+                ProductSearch::apply($productsQuery, $queryText);
+            } else {
+                $productsQuery->orderBy('name');
             }
 
             if (!empty($categoryId)) {
@@ -880,7 +940,6 @@ class ProductController extends Controller
             }
 
             $products = $productsQuery
-                ->orderBy('name')
                 ->paginate(12)
                 ->withQueryString();
         }
@@ -1415,6 +1474,15 @@ class WishlistController extends Controller
     @if(config('orders.turnstile.site_key'))
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     @endif
+@endpush
+
+@push('scripts')
+    <script>
+        window.ueTrack('begin_checkout', {
+            value: @js((float) $total),
+            items: @js($products->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'price' => (float) $p->cart_price, 'quantity' => $p->cart_quantity])->values()),
+        });
+    </script>
 @endpush
 
 @section('content')
@@ -1973,6 +2041,36 @@ IP: {{ $contactMessage->ip_address ?? 'N/A' }} · Received {{ $contactMessage->c
 </x-mail::message>
 
 
+--- FILE: resources/views/emails/errors/alert.blade.php ---
+
+<x-mail::message>
+# {{ $reopened ? 'An error is back' : 'New error on the website' }}
+
+@if($reopened)
+This error was marked as resolved, but it has just happened again.
+@else
+The website recorded an error it hasn't seen before. You won't get another email for this error unless it is resolved and comes back.
+@endif
+
+<x-mail::panel>
+**{{ $error->message }}**
+</x-mail::panel>
+
+**Where:** {{ $error->url ?: ($error->file ? $error->file . ':' . $error->line : '—') }}<br>
+**Type:** {{ $error->type }} ({{ $error->source }})<br>
+@if(! empty($error->context['order']))
+**Order:** {{ $error->context['order'] }}<br>
+@endif
+**When:** {{ $error->last_seen_at?->format('d M Y, h:i A') }}
+
+<x-mail::button :url="$url">
+Open the Error log
+</x-mail::button>
+
+If you're not sure what this means, forward this email to your developer.
+</x-mail::message>
+
+
 --- FILE: resources/views/emails/orders/admin-new-request.blade.php ---
 
 <x-mail::message>
@@ -2096,6 +2194,59 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 📎 The customer attached their list: **{{ $quote->attachment_name }}** (attached to this email).
 @endif
 </x-mail::message>
+
+
+--- FILE: resources/views/filament/pages/backups.blade.php ---
+
+<x-filament-panels::page>
+    @php $backups = $this->getBackups(); @endphp
+
+    <x-filament::section>
+        <x-slot name="heading">How backups work</x-slot>
+        <div class="text-sm space-y-1">
+            <p>Every night at 01:30 the database and all uploaded files (product images, customers' quote files) are saved as a zip.
+               Old backups are removed automatically (all kept for 7 days, then daily / weekly / monthly ones).</p>
+            <p><strong>Download a backup at least once a week and keep it somewhere safe off the server</strong> (e.g. Google Drive).
+               If something goes wrong with the backup, the owner gets an email.</p>
+        </div>
+    </x-filament::section>
+
+    <x-filament::section>
+        <x-slot name="heading">Available backups ({{ count($backups) }})</x-slot>
+
+        @if(empty($backups))
+            <p class="text-sm text-gray-500">No backups yet. They are created every night (the cron job must be running), or use "Back up now".</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-200 dark:border-white/10">
+                        <th class="py-2 pr-4 font-medium">Created</th>
+                        <th class="py-2 pr-4 font-medium">File</th>
+                        <th class="py-2 pr-4 font-medium">Size</th>
+                        <th class="py-2"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($backups as $backup)
+                        <tr class="border-b border-gray-100 dark:border-white/5">
+                            <td class="py-2 pr-4">{{ $backup['date']->format('d M Y, h:i A') }} <span class="text-gray-500">({{ $backup['date']->diffForHumans() }})</span></td>
+                            <td class="py-2 pr-4 font-mono text-xs">{{ $backup['name'] }}</td>
+                            <td class="py-2 pr-4">{{ $backup['size'] }}</td>
+                            <td class="py-2 text-right">
+                                <x-filament::button size="sm" color="gray" icon="heroicon-o-arrow-down-tray"
+                                                    wire:click="download('{{ $backup['path'] }}')">
+                                    Download
+                                </x-filament::button>
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
+</x-filament-panels::page>
 
 
 --- FILE: resources/views/home.blade.php ---
@@ -2309,6 +2460,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
         <link rel="icon" href="{{ $faviconUrl }}">
     @endif
     @stack('meta')
+    @include('partials.analytics')
 
     <style>{!! \App\Support\Theme::cssVariables() !!}</style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -2615,6 +2767,7 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
         </div>
     </footer>
 </div>
+@stack('scripts')
 </body>
 </html>
 
@@ -2702,6 +2855,18 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
     $storeWhatsApp = \App\Models\SiteSetting::current()->whatsappLink('Assalam o Alaikum, I have placed order request ' . $order->reference . ' on your website.');
     $isCancelled   = $order->status === OrderStatus::Cancelled;
 @endphp
+
+@if(session('order_placed'))
+    @push('scripts')
+        <script>
+            window.ueTrack('lead', {
+                kind: 'order_request',
+                value: @js((float) $order->subtotal),
+                items: @js($order->items->map(fn ($i) => ['id' => $i->product_id, 'name' => $i->product_name, 'price' => (float) $i->unit_price, 'quantity' => $i->quantity])->values()),
+            });
+        </script>
+    @endpush
+@endif
 
 @section('content')
     <section class="bg-brand text-white">
@@ -2879,6 +3044,65 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
         </article>
     </section>
 @endsection
+
+
+--- FILE: resources/views/partials/analytics.blade.php ---
+
+{{-- Analytics & ads tracking (Website → SEO). Nothing loads unless an ID is set.
+     window.ueTrack(event, data) is always defined, so pages can call it safely. --}}
+@php
+    $ga4   = content('seo.ga4_id');
+    $pixel = content('seo.meta_pixel_id');
+    $ga4   = is_string($ga4) && preg_match('/^G-[A-Z0-9]{4,20}$/', $ga4) ? $ga4 : null;
+    $pixel = is_string($pixel) && preg_match('/^\d{6,20}$/', $pixel) ? $pixel : null;
+@endphp
+@if($ga4)
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ $ga4 }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){ dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', @js($ga4));
+    </script>
+@endif
+@if($pixel)
+    <script>
+        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;
+        s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', @js($pixel));
+        fbq('track', 'PageView');
+    </script>
+@endif
+<script>
+    // event: 'add_to_cart' | 'begin_checkout' | 'lead'   data: { value, items: [{ id, name, price, quantity }], kind }
+    window.ueTrack = function (event, data) {
+        data = data || {};
+        var items = data.items || [];
+        var value = Number(data.value || 0);
+        try {
+            if (typeof window.gtag === 'function') {
+                var gaName = { add_to_cart: 'add_to_cart', begin_checkout: 'begin_checkout', lead: 'generate_lead' }[event];
+                if (gaName) {
+                    window.gtag('event', gaName, {
+                        currency: 'PKR', value: value, lead_type: data.kind,
+                        items: items.map(function (i) { return { item_id: String(i.id), item_name: i.name, price: Number(i.price), quantity: Number(i.quantity || 1) }; })
+                    });
+                }
+            }
+            if (typeof window.fbq === 'function') {
+                var fbName = { add_to_cart: 'AddToCart', begin_checkout: 'InitiateCheckout', lead: 'Lead' }[event];
+                if (fbName) {
+                    window.fbq('track', fbName, {
+                        currency: 'PKR', value: value, content_type: 'product',
+                        content_ids: items.map(function (i) { return String(i.id); }),
+                        content_name: data.kind || (items[0] && items[0].name) || undefined
+                    });
+                }
+            }
+        } catch (e) { /* tracking must never break the page */ }
+    };
+</script>
 
 
 --- FILE: resources/views/partials/product-card.blade.php ---
@@ -3419,6 +3643,12 @@ Or call: [{{ $quote->displayPhone() }}](tel:{{ $quote->phone }})
 @push('meta')
     <meta name="robots" content="noindex, nofollow">
 @endpush
+
+@if($reference)
+    @push('scripts')
+        <script>window.ueTrack('lead', { kind: 'quote_request', value: 0 });</script>
+    @endpush
+@endif
 
 @section('content')
     @php
@@ -4893,13 +5123,13 @@ class SiteSetting extends Model
         return once(fn () => static::first() ?? static::create([
             'store_name'              => 'Usman Electronics',
             'contact_phone'           => '+92 323 4146388',
-            'contact_email'           => 'info@example.com',
+            'contact_email'           => null, // set in Admin → Website → Store & contact
             'store_address'           => "Al-Hamra Electric Store\nMadina Electric Market, 37\nShah Alam Gate, Lahore, Pakistan",
             'facebook_url'            => null,
             'instagram_url'           => null,
             'whatsapp_url'            => null,
             'map_embed_url'           => 'https://maps.app.goo.gl/HW8Fk18AqHee17ht8',
-            'contact_recipient_email' => 'test@test.com',
+            'contact_recipient_email' => null, // falls back to ORDER_ADMIN_EMAIL
         ]));
     }
 }
