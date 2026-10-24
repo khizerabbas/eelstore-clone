@@ -106,6 +106,27 @@
                     @endif
                 </div>
 
+                {{-- Other sizes (products sharing the same size group – set in the admin) --}}
+                @php $otherSizes = $product->otherSizes(); @endphp
+                @if($otherSizes->isNotEmpty())
+                    <div>
+                        <div class="text-xs font-semibold text-gray-700 mb-2">{{ \App\Support\Content::text('pages.product_other_sizes') }}</div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border-2 border-accent bg-accent/10 text-xs font-semibold text-slate-900" aria-current="true">
+                                {{ $product->sizeLabel() }}
+                                <span class="font-normal text-gray-600">Rs {{ number_format($product->getDisplayPrice()) }}</span>
+                            </span>
+                            @foreach($otherSizes as $size)
+                                <a href="{{ route('product.show', $size->slug) }}"
+                                   class="inline-flex flex-col items-center px-3 py-1.5 rounded-md border border-gray-300 bg-white text-xs font-semibold text-slate-800 hover:border-accent">
+                                    {{ $size->sizeLabel() }}
+                                    <span class="font-normal text-gray-600">Rs {{ number_format($size->getDisplayPrice()) }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="border-t border-gray-200 pt-4">
                     <p class="text-sm text-gray-700 mb-3">
                         {{ $product->short_description ?: \App\Support\Content::text('pages.product_no_description') }}
@@ -118,6 +139,12 @@
                 </div>
 
                     <div class="border-t border-gray-200 pt-4 flex flex-col gap-3 max-w-sm">
+                        @if($product->customer_note)
+                            <div class="text-sm text-slate-800 bg-accent/10 border border-accent/40 rounded-md px-3 py-2">
+                                ℹ️ {{ $product->customer_note }}
+                            </div>
+                        @endif
+
                         <form
                             action="{{ route('cart.add', $product) }}"
                             method="POST"
@@ -175,7 +202,18 @@
                             </button>
                         </form>
 
-
+                        @php
+                            $askWhatsApp = \App\Models\SiteSetting::current()->whatsappLink(
+                                'Assalam o Alaikum, I have a question about: ' . $product->name . ' – ' . route('product.show', $product->slug)
+                            );
+                        @endphp
+                        @if($askWhatsApp)
+                            <a href="{{ $askWhatsApp }}" target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                                <x-store-icon name="whatsapp" class="w-4 h-4"/>
+                                {{ \App\Support\Content::text('pages.product_whatsapp_button') }}
+                            </a>
+                        @endif
                     </div>
 
             </div>

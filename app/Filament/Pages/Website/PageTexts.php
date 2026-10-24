@@ -41,6 +41,8 @@ class PageTexts extends ContentPage
                         $text('category_empty', 'Empty category'),
                         $text('sale_badge', 'Sale badge', 15),
                         $text('add_to_cart', '"Add to cart" button', 30),
+                        $text('product_other_sizes', '"Other sizes" heading on product pages', 40),
+                        $text('product_whatsapp_button', 'WhatsApp button on product pages', 60),
                         $text('product_no_description', 'Product without a short description')->helperText(self::placeholdersHint()),
                     ]),
                     Tab::make('Cart & wishlist')->columns(2)->schema([

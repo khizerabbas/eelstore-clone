@@ -153,7 +153,10 @@ Cart → /checkout (name*, phone*, email, address, comment)
 > **Also done:** bulk quote requests (`/bulk-quote`: list + photo/PDF, optional cart items, email + WhatsApp alerts,
 > admin "Quote requests" with statuses), database error log (Settings → Error log: server, jobs, browser, 419/429; grouped,
 > resolvable, clearable, auto-pruned).
-> **Still to do:** wire length estimator (needs the store's real selling units – per coil / per metre).
+> **Decided (2026-10-24): no wire-length estimator.** Each coil size is its own product (e.g. "7/29 wire – 90 m coil");
+> customers mention custom lengths in the checkout comment and details are agreed on WhatsApp. Supporting this: product
+> "Size group" links coil sizes as **Other sizes**, an optional per-product **Note for customers**, and an
+> **"Ask about this product on WhatsApp"** button on every product page.
 
 - Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
 - Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.

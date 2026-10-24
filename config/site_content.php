@@ -92,6 +92,8 @@ return [
         'category_empty'      => 'No products found in this category yet.',
         'sale_badge'          => 'SALE',
         'add_to_cart'         => 'Add to Cart',
+        'product_other_sizes' => 'Other sizes',
+        'product_whatsapp_button' => 'Ask about this product on WhatsApp',
         'product_no_description' => 'High quality product from {store}.',
 
         // Cart

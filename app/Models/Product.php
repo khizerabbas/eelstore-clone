@@ -23,6 +23,9 @@ class Product extends Model
         'name',
         'slug',
         'sku',
+        'size_group',
+        'size_label',
+        'customer_note',
         'price',
         'sale_price',
         'is_on_sale',
@@ -64,6 +67,26 @@ class Product extends Model
         return $this->is_on_sale && $this->sale_price
             ? (float) $this->sale_price
             : (float) $this->price;
+    }
+
+    // Other visible products in the same size group (e.g. the 180 m coil of the same wire), cheapest first
+    public function otherSizes()
+    {
+        if (blank($this->size_group)) {
+            return collect();
+        }
+
+        return static::where('size_group', $this->size_group)
+            ->where('is_active', true)
+            ->whereKeyNot($this->getKey())
+            ->orderByRaw(static::effectivePriceSql())
+            ->get();
+    }
+
+    // Short text for size buttons
+    public function sizeLabel(): string
+    {
+        return $this->size_label ?: $this->name;
     }
 
     // Main image (WebP copy of the requested size when available) or null

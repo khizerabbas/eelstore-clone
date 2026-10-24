@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Filament\Support\Fields;
+use App\Models\Product;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -56,6 +57,28 @@ class ProductForm
                                         ['h2', 'h3', 'bulletList', 'orderedList', 'table'],
                                         ['undo', 'redo'],
                                     ])
+                                    ->columnSpanFull(),
+                            ]),
+                        Section::make('Sizes & note')
+                            ->description('Optional. Products with the same size group link to each other as "Other sizes" on the product page.')
+                            ->columns(2)
+                            ->schema([
+                                TextInput::make('size_group')
+                                    ->label('Size group')
+                                    ->placeholder('e.g. 7/29 wire')
+                                    ->helperText('Type exactly the same group on every size of this product.')
+                                    ->maxLength(100)
+                                    ->datalist(fn () => Product::whereNotNull('size_group')->distinct()->orderBy('size_group')->pluck('size_group')->all()),
+                                TextInput::make('size_label')
+                                    ->label('Size label')
+                                    ->placeholder('e.g. 90 m')
+                                    ->helperText('Short text on the size button. Empty = product name.')
+                                    ->maxLength(40),
+                                Textarea::make('customer_note')
+                                    ->label('Note for customers (shown near "Add to cart")')
+                                    ->placeholder('e.g. Custom lengths available – mention the length you need in the order comment.')
+                                    ->rows(2)
+                                    ->maxLength(300)
                                     ->columnSpanFull(),
                             ]),
                         Section::make('Images')

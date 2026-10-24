@@ -188,7 +188,9 @@ The scheduler starts the queue worker every minute, and daily removes failed job
 - [ ] **Catalog → Brands**: upload brand logos (used in "Shop by brand" and on brand pages).
 - [ ] **Website → Home slider**: upload real slides (about 1600 × 600 px).
 - [ ] **Website → Content pages**: create at least *About us*, *Delivery & Cash on Delivery*, *Returns & warranty*, *Privacy policy*.
-- [ ] **Catalog**: real categories, brands and products with images.
+- [ ] **Catalog**: real categories, brands and products with images. For wires/cables sold in several coil sizes, give every size
+  the same **Size group** (e.g. `7/29 wire`) and a **Size label** (e.g. `90 m`) so they link to each other as "Other sizes";
+  add a **Note for customers** where useful (e.g. "Custom lengths available – mention it in the order comment").
 
 ### Demo / test data to remove before launch
 Only relevant if you copy the local database or run the seeders:
@@ -264,4 +266,5 @@ php artisan up
 | 2026-10-24 | Brand pages `/brand/{slug}`, home product blocks | Nothing extra (migrate + optimize as usual) |
 | 2026-10-24 | Error log in the database (server, background jobs, browser, 419/429) | `migrate`; optional `ERROR_LOG_*` in `.env`; cron line prunes old entries |
 | 2026-10-24 | Browser error reports endpoint `POST /client-errors` (CSRF-exempt, rate-limited) | Nothing – must not be blocked by a firewall/WAF rule |
+| 2026-10-24 | Product page helpers: other sizes, customer note, "Ask on WhatsApp" | `migrate` (3 new product columns) |
 | 2026-10-24 | Bulk quote requests `/bulk-quote` with photo/PDF upload (private disk) | `migrate`; `storage/app/private` writable + backed up; uploads ≤ 10 MB (php.ini §2 already covers it) |
