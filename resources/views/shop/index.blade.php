@@ -1,15 +1,15 @@
 @extends('layouts.frontend')
 
-@section('title', 'Shop – ' . config('app.name'))
+@section('title', \App\Support\Content::text('pages.shop_title') . \App\Support\Content::text('seo.title_suffix'))
 
 @section('content')
     {{-- Header --}}
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold">Shop</h1>
+                <h1 class="text-2xl font-bold">{{ \App\Support\Content::text('pages.shop_title') }}</h1>
                 <p class="text-sm text-gray-300 mt-1">
-                    Browse products from Usman Electronics and filter by category, price and sale.
+                    {{ \App\Support\Content::text('pages.shop_intro') }}
                 </p>
             </div>
         </div>
@@ -35,7 +35,7 @@
                         <div class="space-y-2 text-sm text-gray-700">
                             @foreach($categories as $category)
                                 {{-- Top-level category row --}}
-                                <label class="flex items-center gap-2 cursor-pointer hover:text-amber-600">
+                                <label class="flex items-center gap-2 cursor-pointer hover:text-accent-ink">
                                     <input
                                         type="checkbox"
                                         name="categories[]"
@@ -56,7 +56,7 @@
                                 @if(!empty($categoryCompanies[$category->id]))
                                     <div class="mt-1 mb-1 space-y-1 text-xs text-gray-600 pl-6">
                                         @foreach($categoryCompanies[$category->id] as $company)
-                                            <label class="flex items-center gap-2 cursor-pointer hover:text-amber-600">
+                                            <label class="flex items-center gap-2 cursor-pointer hover:text-accent-ink">
                                                 <span class="text-gray-400 text-sm leading-none">›</span>
                                                 <input
                                                     type="checkbox"
@@ -129,7 +129,7 @@
 
                         <button
                             type="submit"
-                            class="mt-3 inline-flex items-center px-4 py-1.5 rounded-md bg-amber-400 text-slate-900 text-xs font-semibold hover:bg-amber-300 shadow-sm"
+                            class="mt-3 inline-flex items-center px-4 py-1.5 rounded-md bg-accent text-on-accent text-xs font-semibold hover:bg-accent/80 shadow-sm"
                         >
                             Filter
                         </button>
@@ -146,7 +146,7 @@
                             Showing {{ $products->firstItem() }}–{{ $products->lastItem() }}
                             of {{ $products->total() }} product(s)
                         @else
-                            No products found with current filters.
+                            {{ \App\Support\Content::text('pages.shop_empty') }}
                         @endif
                     </div>
 
@@ -158,7 +158,7 @@
                                 <select
                                     name="per_page"
                                     form="shop-filters-form"
-                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                                     onchange="this.form.submit()"
                                 >
                                     @foreach([12, 20, 40, 60] as $size)
@@ -180,7 +180,7 @@
                                 <select
                                     name="sort"
                                     form="shop-filters-form"
-                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="select-clean border border-gray-300 rounded-md px-3 pr-8 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                                     onchange="this.form.submit()"
                                 >
                                     <option value="default" {{ $sort === 'default' ? 'selected' : '' }}>

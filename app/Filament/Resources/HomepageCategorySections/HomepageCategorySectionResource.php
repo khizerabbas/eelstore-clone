@@ -24,13 +24,13 @@ class HomepageCategorySectionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Storefront';
+    protected static string|UnitEnum|null $navigationGroup = 'Website';
 
     protected static ?string $navigationLabel = 'Home sections';
 
     protected static ?string $modelLabel = 'home section';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Schema $schema): Schema
     {

@@ -25,13 +25,13 @@ class SiteSettings extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Website';
 
-    protected static ?string $navigationLabel = 'Store settings';
+    protected static ?string $navigationLabel = 'Store & contact';
 
-    protected static ?string $title = 'Store settings';
+    protected static ?string $title = 'Store & contact';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 0;
 
     public ?array $data = [];
 
@@ -69,10 +69,6 @@ class SiteSettings extends Page
                             ->maxLength(255),
                         Textarea::make('store_address')
                             ->label('Address')
-                            ->rows(3)
-                            ->maxLength(500),
-                        Textarea::make('footer_about')
-                            ->label('Footer "about" text')
                             ->rows(3)
                             ->maxLength(500),
                     ]),
@@ -114,16 +110,6 @@ class SiteSettings extends Page
                         $link('instagram_url', 'Instagram'),
                         $link('youtube_url', 'YouTube'),
                         $link('x_url', 'X (Twitter)'),
-                    ]),
-                Section::make('Home page')
-                    ->schema([
-                        TextInput::make('home_hero_title')
-                            ->label('Hero title')
-                            ->maxLength(120),
-                        Textarea::make('home_hero_subtitle')
-                            ->label('Hero subtitle')
-                            ->rows(2)
-                            ->maxLength(300),
                     ]),
             ]);
     }

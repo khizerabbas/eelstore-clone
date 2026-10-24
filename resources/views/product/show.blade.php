@@ -1,10 +1,11 @@
 @extends('layouts.frontend')
 
-@section('title', $product->name . ' – ' . config('app.name'))
+@section('title', ($product->meta_title ?: $product->name) . \App\Support\Content::text('seo.title_suffix'))
+@section('meta_description', $product->meta_description ?: \Illuminate\Support\Str::limit(strip_tags((string) ($product->short_description ?: $product->description)), 155))
 
 @section('content')
     {{-- Breadcrumb + title --}}
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <nav class="text-xs text-gray-400 mb-4">
                 <a href="{{ route('home') }}">Home</a>
@@ -24,13 +25,29 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {{-- Left: image(s) --}}
             <div>
-                <div class="bg-slate-50 border border-gray-200 rounded-lg h-72 flex items-center justify-center mb-3">
-                    {{-- Placeholder image / icon --}}
-                    <span class="text-6xl">⚡</span>
-                </div>
-                <p class="text-xs text-gray-500">
-                    (We’ll replace this with actual product images later; for now it’s a placeholder.)
-                </p>
+                @php $images = $product->imageUrls(); @endphp
+                @if(count($images))
+                    <div x-data="{ active: @js($images[0]) }">
+                        <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
+                            <img :src="active" src="{{ $images[0] }}" alt="{{ $product->name }}" class="w-full h-full object-contain">
+                        </div>
+                        @if(count($images) > 1)
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($images as $image)
+                                    <button type="button" x-on:click="active = @js($image)"
+                                            class="w-16 h-16 rounded-md border overflow-hidden bg-white"
+                                            :class="active === @js($image) ? 'border-accent ring-2 ring-accent' : 'border-gray-200'">
+                                        <img src="{{ $image }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @else
+                    <div class="bg-slate-50 border border-gray-200 rounded-lg h-72 flex items-center justify-center mb-3">
+                        <x-store-icon name="bolt" class="w-16 h-16 text-slate-300"/>
+                    </div>
+                @endif
             </div>
 
             {{-- Right: info + actions --}}
@@ -76,7 +93,7 @@
 
                 <div class="border-t border-gray-200 pt-4">
                     <p class="text-sm text-gray-700 mb-3">
-                        {{ $product->short_description ?? 'High quality product from Usman Electronics.' }}
+                        {{ $product->short_description ?: \App\Support\Content::text('pages.product_no_description') }}
                     </p>
                     @if($product->description)
                         <div class="prose prose-sm max-w-none text-gray-700">
@@ -104,14 +121,14 @@
                                 name="quantity"
                                 value="1"
                                 min="1"
-                                class="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                class="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                             >
 
                             <button
                                 type="submit"
-                                class="inline-flex items-center px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+                                class="inline-flex items-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
                             >
-                                Add to Cart
+                                {{ \App\Support\Content::text('pages.add_to_cart') }}
                             </button>
                         </form>
 
@@ -131,7 +148,7 @@
                             @csrf
                             <button
                                 type="submit"
-                                class="inline-flex items-center px-4 py-2 rounded-md border border-slate-900 text-slate-900 text-sm font-semibold hover:bg-slate-900 hover:text-white gap-2"
+                                class="inline-flex items-center px-4 py-2 rounded-md border border-brand text-brand text-sm font-semibold hover:bg-brand hover:text-white gap-2"
                             >
                                 @if($isInWishlist)
                                     <span class="wishlist-heart text-red-500">❤</span>

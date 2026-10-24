@@ -21,5 +21,5 @@ Track your order
 Keep this email – the link above always shows the latest status of your order.
 
 Thanks,<br>
-{{ config('app.name') }}
+{{ \App\Models\SiteSetting::storeName() }}
 </x-mail::message>

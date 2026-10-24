@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Page;
 use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Auth\Events\Login;
@@ -51,15 +52,27 @@ class AppServiceProvider extends ServiceProvider
             // site settings (phone, email, socials, map etc.)
             $settings = SiteSetting::current();
 
-            // categories for the header search dropdown
+            // categories for the header search dropdown and menus (admin sort order)
             $searchCategories = Category::where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get();
 
+            // footer: top-level categories and published CMS pages marked "Link in the footer"
+            $footerCategories = $searchCategories
+                ->whereNull('parent_id')
+                ->take((int) content('footer.categories_limit', 6));
+
+            $footerPages = Page::where('is_published', true)
+                ->where('show_in_footer', true)
+                ->orderBy('sort_order')
+                ->get(['title', 'slug']);
+
             $view->with([
                 'settings'         => $settings,
                 'searchCategories' => $searchCategories,
+                'footerCategories' => $footerCategories,
+                'footerPages'      => $footerPages,
             ]);
         });
     }

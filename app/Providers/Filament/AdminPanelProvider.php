@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Models\SiteSetting;
+use App\Support\Content;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -27,14 +29,18 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->brandName('Usman Electronics')
+            // Branding follows Website → Branding & theme (store name, logo, favicon)
+            ->brandName(fn () => SiteSetting::storeName())
+            ->brandLogo(fn () => Content::imageUrl('branding.logo'))
+            ->brandLogoHeight('2.25rem')
+            ->favicon(fn () => Content::imageUrl('branding.favicon'))
             ->login()
             ->passwordReset()
             ->profile(isSimple: false)
             // Authenticator-app 2FA. Every admin must set it up when ADMIN_REQUIRE_2FA is true (default in production).
             ->multiFactorAuthentication(
                 AppAuthentication::make()
-                    ->brandName('Usman Electronics Admin')
+                    ->brandName(SiteSetting::storeName() . ' Admin')
                     ->recoverable(),
                 isRequired: (bool) config('admin.require_2fa'),
             )
@@ -44,7 +50,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Orders'),
                 NavigationGroup::make('Catalog'),
-                NavigationGroup::make('Storefront'),
+                NavigationGroup::make('Website'),
                 NavigationGroup::make('Settings'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

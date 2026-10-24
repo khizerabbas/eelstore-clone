@@ -1,27 +1,22 @@
-@component('mail::message')
-    # New Contact Form Submission
+<x-mail::message>
+# New contact form message
 
-    You have received a new message from the contact form on **Usman Electronics**.
+You have received a new message from the contact form on **{{ \App\Models\SiteSetting::storeName() }}**.
 
-    **Name:** {{ $contactMessage->name }}
+**Name:** {{ $contactMessage->name }}<br>
+**Email:** {{ $contactMessage->email }}<br>
+@if($contactMessage->phone)
+**Phone:** {{ $contactMessage->phone }}<br>
+@endif
+@if($contactMessage->subject)
+**Subject:** {{ $contactMessage->subject }}
+@endif
 
-    **Email:** {{ $contactMessage->email }}
+**Message:**
 
-    @if($contactMessage->phone)
-        **Phone:** {{ $contactMessage->phone }}
-    @endif
+{{ $contactMessage->message }}
 
-    @if($contactMessage->subject)
-        **Subject:** {{ $contactMessage->subject }}
-    @endif
-
-    **Message:**
-
-    {{ $contactMessage->message }}
-
-    ---
-
-    IP Address: {{ $contactMessage->ip_address ?? 'N/A' }}
-    Submitted at: {{ $contactMessage->created_at->format('Y-m-d H:i') }}
-
-@endcomponent
+<x-mail::subcopy>
+IP: {{ $contactMessage->ip_address ?? 'N/A' }} · Received {{ $contactMessage->created_at->format('d M Y, h:i A') }}
+</x-mail::subcopy>
+</x-mail::message>

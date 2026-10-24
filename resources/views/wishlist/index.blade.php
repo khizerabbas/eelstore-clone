@@ -1,11 +1,11 @@
 @extends('layouts.frontend')
 
-@section('title', 'Wishlist – ' . config('app.name'))
+@section('title', \App\Support\Content::text('pages.wishlist_title') . \App\Support\Content::text('seo.title_suffix'))
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-2xl font-bold">Wishlist</h1>
+            <h1 class="text-2xl font-bold">{{ \App\Support\Content::text('pages.wishlist_title') }}</h1>
         </div>
     </section>
 
@@ -23,11 +23,11 @@
 
         @if($products->isEmpty())
             <p class="text-sm text-gray-600">
-                Your wishlist is currently empty.
+                {{ \App\Support\Content::text('pages.wishlist_empty') }}
             </p>
             <div class="mt-4">
                 <a href="{{ route('home') }}"
-                   class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+                   class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
                     Browse Products
                 </a>
             </div>

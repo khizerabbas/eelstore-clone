@@ -54,6 +54,13 @@ enum OrderStatus: string implements HasColor, HasLabel
     // What the customer should do / expect at this stage (shown on the status page)
     public function customerMessage(): string
     {
+        // Editable in the admin (Website → Page texts); the wording below is the fallback
+        $custom = content('order_status.' . $this->value);
+
+        if (filled($custom)) {
+            return $custom;
+        }
+
         return match ($this) {
             self::New            => 'We have received your order request. Our team will call or WhatsApp you shortly to confirm it.',
             self::Contacted      => 'We have reached out to you. Please check your WhatsApp, phone calls and email to confirm your order.',

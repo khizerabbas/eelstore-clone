@@ -1,6 +1,6 @@
 @extends('layouts.frontend')
 
-@section('title', 'Checkout – ' . config('app.name'))
+@section('title', \App\Support\Content::text('pages.checkout_title') . \App\Support\Content::text('seo.title_suffix'))
 
 @push('meta')
     <meta name="robots" content="noindex, nofollow">
@@ -10,11 +10,11 @@
 @endpush
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-2xl font-bold">Checkout</h1>
+            <h1 class="text-2xl font-bold">{{ \App\Support\Content::text('pages.checkout_title') }}</h1>
             <p class="mt-1 text-sm text-gray-300">
-                Send us your order request – we'll call or WhatsApp you to confirm. Pay cash on delivery.
+                {{ \App\Support\Content::text('pages.checkout_intro') }}
             </p>
         </div>
     </section>
@@ -58,7 +58,7 @@
                                     required
                                     maxlength="100"
                                     autocomplete="name"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('name')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -79,7 +79,7 @@
                                     inputmode="tel"
                                     autocomplete="tel"
                                     placeholder="0300 1234567"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('phone')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -98,7 +98,7 @@
                                 value="{{ old('email') }}"
                                 maxlength="150"
                                 autocomplete="email"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                             >
                             @error('email')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -116,7 +116,7 @@
                                 maxlength="500"
                                 autocomplete="street-address"
                                 placeholder="House, street, area, city"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                             >{{ old('address') }}</textarea>
                             @error('address')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -133,7 +133,7 @@
                                 rows="3"
                                 maxlength="1000"
                                 placeholder="e.g. best time to call, required wire length, delivery instructions…"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                             >{{ old('comment') }}</textarea>
                             @error('comment')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -152,12 +152,12 @@
                         <div class="pt-2">
                             <button
                                 type="submit"
-                                class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-md bg-amber-400 text-slate-900 text-sm font-bold hover:bg-amber-300 disabled:opacity-60 disabled:cursor-wait"
+                                class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-md bg-accent text-on-accent text-sm font-bold hover:bg-accent/80 disabled:opacity-60 disabled:cursor-wait"
                             >
-                                Submit Order Request
+                                {{ \App\Support\Content::text('pages.checkout_submit') }}
                             </button>
                             <p class="mt-2 text-[11px] text-gray-500">
-                                By submitting you agree that we may contact you on the number above about this order.
+                                {{ \App\Support\Content::text('pages.checkout_consent') }}
                             </p>
                         </div>
                     </form>
@@ -169,7 +169,7 @@
                 <div class="bg-white border border-gray-100 rounded-lg p-4">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="text-sm font-semibold">Order Summary</h2>
-                        <a href="{{ route('cart.index') }}" class="text-xs text-amber-600 hover:underline">Edit cart</a>
+                        <a href="{{ route('cart.index') }}" class="text-xs text-accent-ink hover:underline">Edit cart</a>
                     </div>
 
                     <ul class="divide-y divide-gray-100 text-sm">
@@ -188,15 +188,15 @@
                         <span>Total</span>
                         <span>Rs {{ number_format($total) }}</span>
                     </div>
-                    <p class="mt-1 text-[11px] text-gray-500">Delivery charges (if any) are confirmed on call.</p>
+                    <p class="mt-1 text-[11px] text-gray-500">{{ \App\Support\Content::text('pages.delivery_note') }}</p>
                 </div>
 
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-slate-800">
-                    <h3 class="font-semibold mb-2">How it works</h3>
+                <div class="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-slate-800">
+                    <h3 class="font-semibold mb-2">{{ \App\Support\Content::text('pages.checkout_steps_title') }}</h3>
                     <ol class="space-y-1.5 list-decimal list-inside text-xs">
-                        <li>Submit your order request – no payment needed now.</li>
-                        <li>We call or WhatsApp you to confirm items and delivery.</li>
-                        <li>We deliver to your door – you pay <strong>cash on delivery</strong>.</li>
+                        @foreach(collect(content('pages.checkout_steps', []))->pluck('text')->filter() as $step)
+                            <li>{{ $step }}</li>
+                        @endforeach
                     </ol>
                 </div>
             </div>

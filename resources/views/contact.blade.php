@@ -1,14 +1,14 @@
 @extends('layouts.frontend')
 
-@section('title', 'Contact Us – ' . config('app.name'))
+@section('title', \App\Support\Content::text('pages.contact_title') . \App\Support\Content::text('seo.title_suffix'))
 
 @section('content')
     {{-- Hero / heading --}}
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-2xl font-bold mb-2">Contact Us</h1>
+            <h1 class="text-2xl font-bold mb-2">{{ \App\Support\Content::text('pages.contact_title') }}</h1>
             <p class="text-sm text-gray-300">
-                Get in touch with Usman Electronics for any queries, quotes, or support.
+                {{ \App\Support\Content::text('pages.contact_intro') }}
             </p>
         </div>
     </section>
@@ -21,13 +21,13 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Call Us</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center text-lg">
+                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
                             📞
                         </div>
                         <div>
                             <div class="font-semibold">
                                 @if($settings->contact_phone)
-                                    <a href="tel:{{ $settings->contact_phone }}" class="hover:text-amber-600">
+                                    <a href="tel:{{ $settings->contact_phone }}" class="hover:text-accent-ink">
                                         {{ $settings->contact_phone }}
                                     </a>
                                 @else
@@ -35,7 +35,7 @@
                                 @endif
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
-                                Available during business hours.
+                                {{ $settings->opening_hours ?: \App\Support\Content::text('pages.contact_phone_note') }}
                             </div>
                         </div>
                     </div>
@@ -44,13 +44,13 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Email</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center text-lg">
+                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
                             ✉️
                         </div>
                         <div>
                             <div class="font-semibold">
                                 @if($settings->contact_email)
-                                    <a href="mailto:{{ $settings->contact_email }}" class="hover:text-amber-600">
+                                    <a href="mailto:{{ $settings->contact_email }}" class="hover:text-accent-ink">
                                         {{ $settings->contact_email }}
                                     </a>
                                 @else
@@ -58,7 +58,7 @@
                                 @endif
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
-                                We usually respond within 1–2 business days.
+                                {{ \App\Support\Content::text('pages.contact_email_note') }}
                             </div>
                         </div>
                     </div>
@@ -67,15 +67,15 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Store Location</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center text-lg">
+                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
                             📍
                         </div>
                         <div>
                             <div class="font-semibold mb-1">
-                                Usman Electronics
+                                {{ $settings->store_name }}
                             </div>
                             <div class="text-xs text-gray-600 whitespace-pre-line">
-                                {{ $settings->store_address ?? "Al-Hamra Electric Store\nMadina Electric Market, 37\nShah Alam Gate, Lahore, Pakistan" }}
+                                {{ $settings->store_address }}
                             </div>
                         </div>
                     </div>
@@ -119,7 +119,7 @@
                                     name="name"
                                     value="{{ old('name') }}"
                                     required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('name')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -135,7 +135,7 @@
                                     name="email"
                                     value="{{ old('email') }}"
                                     required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('email')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -152,7 +152,7 @@
                                     type="text"
                                     name="phone"
                                     value="{{ old('phone') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('phone')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -167,7 +167,7 @@
                                     type="text"
                                     name="subject"
                                     value="{{ old('subject') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                 @error('subject')
                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -183,7 +183,7 @@
                                 name="message"
                                 rows="5"
                                 required
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                             >{{ old('message') }}</textarea>
                             @error('message')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -193,9 +193,9 @@
                         <div>
                             <button
                                 type="submit"
-                                class="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+                                class="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
                             >
-                                Send Message
+                                {{ \App\Support\Content::text('pages.contact_button') }}
                             </button>
                         </div>
                     </form>
@@ -223,34 +223,31 @@
                 </div>
             @elseif($settings->map_embed_url && str_starts_with($settings->map_embed_url, 'https://'))
                 <a href="{{ $settings->map_embed_url }}" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
                     📍 Open our location in Google Maps
                 </a>
             @endif
 
-            <div class="flex flex-wrap items-center gap-4">
-                <span class="text-sm font-semibold text-gray-700">Follow Us:</span>
-
-                @if($settings->facebook_url)
-                    <a href="{{ $settings->facebook_url }}" target="_blank"
-                       class="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-amber-400 hover:text-slate-900 text-lg">
-                        f
-                    </a>
-                @endif
-
-                @if($settings->instagram_url)
-                    <a href="{{ $settings->instagram_url }}" target="_blank"
-                       class="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-amber-400 hover:text-slate-900 text-lg">
-                        📸
-                    </a>
-                @endif
-
-                @if($settings->whatsapp_url)
-                    <a href="{{ $settings->whatsapp_url }}" target="_blank"
-                       class="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-400 text-lg">
-                        🟢
-                    </a>
-                @endif
+            @php
+                $contactSocials = collect([
+                    'facebook'  => ['Facebook', $settings->facebook_url],
+                    'instagram' => ['Instagram', $settings->instagram_url],
+                    'youtube'   => ['YouTube', $settings->youtube_url],
+                    'x'         => ['X (Twitter)', $settings->x_url],
+                    'whatsapp'  => ['WhatsApp', $settings->whatsappLink()],
+                ])->filter(fn ($s) => $s[1] && preg_match('/^https?:\/\//i', $s[1]));
+            @endphp
+            @if($contactSocials->isNotEmpty())
+                <div class="flex flex-wrap items-center gap-4">
+                    <span class="text-sm font-semibold text-gray-700">Follow Us:</span>
+                    @foreach($contactSocials as $icon => [$label, $url])
+                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $label }}"
+                           class="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center hover:bg-accent hover:text-on-accent">
+                            <x-store-icon :name="$icon" class="w-4 h-4"/>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
             </div>
         </div>
     </section>

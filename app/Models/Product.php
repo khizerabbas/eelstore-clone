@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -56,6 +57,24 @@ class Product extends Model
         return $this->is_on_sale && $this->sale_price
             ? (float) $this->sale_price
             : (float) $this->price;
+    }
+
+    // Uploaded main image (public disk) or null
+    public function imageUrl(): ?string
+    {
+        return $this->image ? Storage::disk('public')->url($this->image) : null;
+    }
+
+    // Main image followed by gallery images
+    public function imageUrls(): array
+    {
+        return collect([$this->image])
+            ->merge($this->gallery ?? [])
+            ->filter()
+            ->unique()
+            ->map(fn (string $path) => Storage::disk('public')->url($path))
+            ->values()
+            ->all();
     }
 
     // SQL version of getDisplayPrice() for whereBetween / orderBy / min / max

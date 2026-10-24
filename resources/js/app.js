@@ -235,10 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dots.forEach((dot, i) => {
             if (i === index) {
-                dot.classList.add('bg-amber-400');
+                dot.classList.add('bg-accent');
                 dot.classList.remove('bg-slate-600');
             } else {
-                dot.classList.remove('bg-amber-400');
+                dot.classList.remove('bg-accent');
                 dot.classList.add('bg-slate-600');
             }
         });

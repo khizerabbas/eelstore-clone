@@ -1,7 +1,7 @@
 <x-mail::message>
 # New order request {{ $order->reference }}
 
-A customer has requested an order on **{{ config('app.name') }}**. Please call or WhatsApp them to confirm it (Cash on Delivery).
+A customer has requested an order on **{{ \App\Models\SiteSetting::storeName() }}**. Please call or WhatsApp them to confirm it (Cash on Delivery).
 
 **Name:** {{ $order->customer_name }}<br>
 **Phone:** {{ $order->displayPhone() }}<br>
@@ -13,7 +13,7 @@ A customer has requested an order on **{{ config('app.name') }}**. Please call o
 @endif
 **Submitted:** {{ $order->created_at->timezone(config('app.timezone'))->format('d M Y, h:i A') }}
 
-<x-mail::button :url="$order->whatsappUrl('Assalam o Alaikum ' . $order->customer_name . ', this is ' . config('app.name') . ' about your order request ' . $order->reference . '.')" color="success">
+<x-mail::button :url="$order->whatsappUrl('Assalam o Alaikum ' . $order->customer_name . ', this is ' . \App\Models\SiteSetting::storeName() . ' about your order request ' . $order->reference . '.')" color="success">
 WhatsApp {{ $order->customer_name }}
 </x-mail::button>
 

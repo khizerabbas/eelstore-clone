@@ -5,6 +5,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
@@ -41,6 +42,9 @@ Route::get('/admin/orders/{order:id}/print', OrderPrintController::class)
     ->middleware('auth')
     ->whereNumber('order')
     ->name('admin.orders.print');
+
+// CMS pages managed in the admin (Website → Content pages)
+Route::get('/pages/{slug}', [PageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');
 
 Route::get('/contact-us',[ContactController::class, 'index'])->name('contact.show');
 Route::post('/contact-us', [ContactController::class, 'submit'])->name('contact.submit');

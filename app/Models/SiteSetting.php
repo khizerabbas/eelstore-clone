@@ -58,9 +58,20 @@ class SiteSetting extends Model
         return str_starts_with($value, 'https://www.google.com/maps/embed') ? $value : null;
     }
 
+    // Store name from settings (admin-editable), falling back to APP_NAME
+    public static function storeName(): string
+    {
+        try {
+            return static::current()->store_name ?: config('app.name');
+        } catch (\Throwable) {
+            return config('app.name'); // DB not ready (e.g. during install)
+        }
+    }
+
+    // The single settings row (loaded once per request)
     public static function current(): self
     {
-        return static::first() ?? static::create([
+        return once(fn () => static::first() ?? static::create([
             'store_name'              => 'Usman Electronics',
             'contact_phone'           => '+92 323 4146388',
             'contact_email'           => 'info@example.com',
@@ -70,6 +81,6 @@ class SiteSetting extends Model
             'whatsapp_url'            => null,
             'map_embed_url'           => 'https://maps.app.goo.gl/HW8Fk18AqHee17ht8',
             'contact_recipient_email' => 'test@test.com',
-        ]);
+        ]));
     }
 }

@@ -22,11 +22,11 @@ class PageResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Storefront';
+    protected static string|UnitEnum|null $navigationGroup = 'Website';
 
     protected static ?string $navigationLabel = 'Content pages';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 8;
 
     protected static ?string $recordTitleAttribute = 'title';
 

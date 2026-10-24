@@ -137,7 +137,17 @@ Cart → /checkout (name*, phone*, email, address, comment)
 - **Content**: CMS pages (About, Delivery & COD, Returns, Warranty, Privacy, Terms, FAQ) and the contact messages inbox.
 - Activity log of who changed what.
 
-### Step 3 – Fully dynamic storefront 🟠
+### Step 3 – Fully dynamic storefront 🟡 (mostly done 2026-10-24)
+> **Done:** admin "Website" section – Store & contact, Branding & theme (logo, favicon, tagline, brand/accent/background
+> colours with readability checks), Header & menu (top bar, labels, extra links), Home page (hero, buttons, benefits strip),
+> Home slider, Home sections, Footer (about, links, headings, copyright), Page texts (every storefront message, checkout
+> steps, thank-you text, order-status messages), Content pages (public at `/pages/{slug}`), SEO (titles, description,
+> share image, Google verification). Content lives in `site_contents` with defaults in `config/site_content.php`
+> (`content('key')` helper, cached). Theme colours are CSS variables used by Tailwind (`brand`, `accent`, `on-accent`,
+> `accent-ink`, `page`). Product images + gallery now show on cards, product page and cart.
+> **Still to do:** resized/WebP copies of uploaded images (10 MB originals are served as-is for now), proper indexable
+> category pages, brand pages, deals/new-arrivals blocks, wire length estimator, bulk quote form.
+
 - Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
 - Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.
 - **Proper category pages.** `/category/{slug}` should render its own indexable page with filters, not redirect to `/shop?categories[]=…`.

@@ -20,7 +20,7 @@ class OrderActions
             ->icon(Heroicon::OutlinedChatBubbleLeftRight)
             ->color('success')
             ->url(fn (Order $record) => $record->whatsappUrl(
-                'Assalam o Alaikum ' . $record->customer_name . ', this is ' . config('app.name')
+                'Assalam o Alaikum ' . $record->customer_name . ', this is ' . \App\Models\SiteSetting::storeName()
                 . ' about your order request ' . $record->reference . '.'
             ), shouldOpenInNewTab: true);
     }

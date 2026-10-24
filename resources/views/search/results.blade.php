@@ -1,9 +1,9 @@
 @extends('layouts.frontend')
 
-@section('title', 'Search – ' . config('app.name'))
+@section('title', 'Search' . \App\Support\Content::text('seo.title_suffix'))
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <h1 class="text-2xl font-bold mb-2">Search</h1>
             <p class="text-sm text-gray-300">
@@ -24,7 +24,7 @@
         @else
             @if($products->isEmpty())
                 <p class="text-sm text-gray-600">
-                    No products found matching “{{ $query }}”.
+                    {{ \App\Support\Content::text('pages.search_empty') }}
                 </p>
             @else
                 <div class="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-md px-4 py-3 shadow-sm">

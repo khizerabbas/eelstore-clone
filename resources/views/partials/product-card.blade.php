@@ -14,7 +14,7 @@
         <div>
             @if($product->is_on_sale)
                 <span class="inline-flex items-center bg-red-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-auto">
-                    SALE
+                    {{ \App\Support\Content::text('pages.sale_badge') }}
                 </span>
             @endif
         </div>
@@ -46,9 +46,12 @@
 
     {{-- Product image / placeholder --}}
     <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-       class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center">
-        {{-- TODO: replace with real image later --}}
-        <span class="text-3xl">⚡</span>
+       class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center overflow-hidden">
+        @if($product->imageUrl())
+            <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
+        @else
+            <x-store-icon name="bolt" class="w-10 h-10 text-slate-300"/>
+        @endif
     </a>
 
     {{-- Text content --}}
@@ -111,7 +114,7 @@
                 type="submit"
                 class="flex items-center gap-1 text-[11px] font-medium text-gray-700 hover:text-slate-900"
             >
-                🛒 <span>Add to Cart</span>
+                🛒 <span>{{ \App\Support\Content::text('pages.add_to_cart') }}</span>
             </button>
         </form>
 
@@ -128,7 +131,7 @@
     <div class="md:hidden px-4 pb-4 space-y-2">
         <a
             href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
-            class="block w-full text-center text-xs font-semibold rounded-md bg-slate-900 text-white py-2 hover:bg-slate-800"
+            class="block w-full text-center text-xs font-semibold rounded-md bg-brand text-white py-2 hover:bg-brand/90"
         >
             View Details
         </a>
@@ -143,9 +146,9 @@
             <input type="hidden" name="quantity" value="1">
             <button
                 type="submit"
-                class="w-full text-center text-xs font-semibold rounded-md border border-slate-900 text-slate-900 py-2 hover:bg-slate-900 hover:text-white"
+                class="w-full text-center text-xs font-semibold rounded-md border border-brand text-brand py-2 hover:bg-brand hover:text-white"
             >
-                Add to Cart
+                {{ \App\Support\Content::text('pages.add_to_cart') }}
             </button>
         </form>
     </div>

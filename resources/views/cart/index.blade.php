@@ -1,11 +1,11 @@
 @extends('layouts.frontend')
 
-@section('title', 'Cart – ' . config('app.name'))
+@section('title', \App\Support\Content::text('pages.cart_title') . \App\Support\Content::text('seo.title_suffix'))
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-2xl font-bold">Shopping Cart</h1>
+            <h1 class="text-2xl font-bold">{{ \App\Support\Content::text('pages.cart_title') }}</h1>
         </div>
     </section>
 
@@ -23,11 +23,11 @@
 
         @if($products->isEmpty())
             <p class="text-sm text-gray-600">
-                Your cart is currently empty.
+                {{ \App\Support\Content::text('pages.cart_empty') }}
             </p>
             <div class="mt-4">
                 <a href="{{ route('home') }}"
-                   class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+                   class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
                     Continue Shopping
                 </a>
             </div>
@@ -36,14 +36,18 @@
                 <div class="lg:col-span-2 space-y-4">
                     @foreach($products as $product)
                         <div class="bg-white border border-gray-100 rounded-lg p-4 flex gap-4 items-start">
-                            <div class="w-20 h-20 bg-slate-50 rounded-md flex items-center justify-center text-3xl">
-                                ⚡
+                            <div class="w-20 h-20 bg-slate-50 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
+                                @if($product->imageUrl())
+                                    <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
+                                @else
+                                    <x-store-icon name="bolt" class="w-8 h-8 text-slate-300"/>
+                                @endif
                             </div>
                             <div class="flex-1">
                                 <div class="flex justify-between gap-4">
                                     <div>
                                         <a href="{{ route('product.show', $product->slug) }}"
-                                           class="text-sm font-semibold text-slate-900 hover:text-amber-600">
+                                           class="text-sm font-semibold text-slate-900 hover:text-accent-ink">
                                             {{ $product->name }}
                                         </a>
                                         @if($product->company)
@@ -76,11 +80,11 @@
                                             name="quantity"
                                             min="0"
                                             value="{{ $product->cart_quantity }}"
-                                            class="w-20 border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                            class="w-20 border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
                                         >
                                         <button
                                             type="submit"
-                                            class="text-xs px-3 py-1 rounded-md border border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                                            class="text-xs px-3 py-1 rounded-md border border-brand text-brand hover:bg-brand hover:text-white"
                                         >
                                             Update
                                         </button>
@@ -126,12 +130,12 @@
                     <div class="mt-4 flex flex-col gap-2">
                         <a
                             href="{{ route('checkout.show') }}"
-                            class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+                            class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
                         >
-                            Proceed to Checkout
+                            {{ \App\Support\Content::text('pages.cart_checkout_button') }}
                         </a>
                         <p class="text-[11px] text-gray-500 text-center">
-                            No online payment – pay cash on delivery after we confirm your order.
+                            {{ \App\Support\Content::text('pages.cart_cod_note') }}
                         </p>
 
                         <form action="{{ route('cart.clear') }}" method="POST">

@@ -1,6 +1,6 @@
 @extends('layouts.frontend')
 
-@section('title', 'Order ' . $order->reference . ' – ' . config('app.name'))
+@section('title', 'Order ' . $order->reference . \App\Support\Content::text('seo.title_suffix'))
 
 @push('meta')
     <meta name="robots" content="noindex, nofollow">
@@ -15,7 +15,7 @@
 @endphp
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <p class="text-xs text-gray-400">Order request</p>
@@ -37,10 +37,9 @@
         {{-- Thank-you block right after submitting --}}
         @if(session('order_placed'))
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-5 sm:p-6">
-                <h2 class="text-lg font-bold text-emerald-800">Thank you, {{ $order->customer_name }}! 🎉</h2>
+                <h2 class="text-lg font-bold text-emerald-800">{{ \App\Support\Content::text('pages.thankyou_title', ['name' => $order->customer_name]) }}</h2>
                 <p class="mt-1 text-sm text-emerald-900">
-                    Your order request <strong>{{ $order->reference }}</strong> has been sent to our team.
-                    We will call or WhatsApp you on <strong>{{ $order->maskedPhone() }}</strong> shortly to confirm it.
+                    {{ \App\Support\Content::text('pages.thankyou_text', ['name' => $order->customer_name, 'reference' => $order->reference, 'phone' => $order->maskedPhone()]) }}
                     @if($order->customer_email)
                         A confirmation has also been sent to your email.
                     @endif
@@ -49,7 +48,7 @@
                     @if($storeWhatsApp)
                         <a href="{{ $storeWhatsApp }}" target="_blank" rel="noopener noreferrer"
                            class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
-                            💬 Message us on WhatsApp for a faster reply
+                            {{ \App\Support\Content::text('pages.thankyou_whatsapp_button') }}
                         </a>
                     @endif
                     <a href="{{ route('shop.index') }}"
@@ -125,7 +124,7 @@
                 <form action="{{ route('orders.reorder', $order) }}" method="POST">
                     @csrf
                     <button type="submit"
-                            class="text-xs px-3 py-1.5 rounded-md border border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white">
+                            class="text-xs px-3 py-1.5 rounded-md border border-brand text-brand hover:bg-brand hover:text-white">
                         🔁 Order these again
                     </button>
                 </form>
@@ -146,7 +145,7 @@
                         <tr>
                             <td class="py-2 pr-3">
                                 @if($item->product_slug && $item->product_id)
-                                    <a href="{{ route('product.show', $item->product_slug) }}" class="hover:text-amber-600">{{ $item->product_name }}</a>
+                                    <a href="{{ route('product.show', $item->product_slug) }}" class="hover:text-accent-ink">{{ $item->product_name }}</a>
                                 @else
                                     {{ $item->product_name }}
                                 @endif

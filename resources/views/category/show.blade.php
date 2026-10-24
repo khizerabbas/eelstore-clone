@@ -1,9 +1,10 @@
 @extends('layouts.frontend')
 
-@section('title', $category->name . ' – ' . config('app.name'))
+@section('title', ($category->meta_title ?: $category->name) . \App\Support\Content::text('seo.title_suffix'))
+@section('meta_description', $category->meta_description ?: \Illuminate\Support\Str::limit((string) $category->description, 155))
 
 @section('content')
-    <section class="bg-slate-900 text-white">
+    <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <h1 class="text-2xl font-bold">{{ $category->name }}</h1>
             @if($category->description)
@@ -15,7 +16,7 @@
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         @if ($products->isEmpty())
             <p class="text-sm text-gray-600">
-                No products found in this category yet.
+                {{ \App\Support\Content::text('pages.category_empty') }}
             </p>
         @else
             @if ($hasCompanies)
