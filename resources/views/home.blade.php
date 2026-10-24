@@ -89,14 +89,14 @@
     @if(content('home.benefits_enabled') && $benefits->isNotEmpty())
         <section class="bg-white border-t border-b border-slate-100">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 {{ $benefits->count() >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3' }} gap-6">
+                <div class="grid grid-cols-2 {{ $benefits->count() >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3' }} gap-x-4 gap-y-5 sm:gap-6">
                     @foreach($benefits as $benefit)
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-brand text-accent flex items-center justify-center">
-                                <x-store-icon :name="$benefit['icon'] ?? 'check'" class="w-5 h-5"/>
+                        <div class="flex items-start gap-2.5 sm:gap-3">
+                            <div class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-brand text-accent flex items-center justify-center">
+                                <x-store-icon :name="$benefit['icon'] ?? 'check'" class="w-4 h-4 sm:w-5 sm:h-5"/>
                             </div>
                             <div>
-                                <div class="font-semibold text-sm sm:text-base text-slate-900">{{ $benefit['title'] }}</div>
+                                <div class="font-semibold text-[13px] sm:text-base text-slate-900 leading-tight">{{ $benefit['title'] }}</div>
                                 @if(filled($benefit['text'] ?? null))
                                     <div class="text-xs sm:text-sm text-slate-500">{{ $benefit['text'] }}</div>
                                 @endif

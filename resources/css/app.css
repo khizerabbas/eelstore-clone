@@ -1,21 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Clean select: hide native arrow across browsers, we use our own ▾ icon */
-.select-clean {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-image: none !important;
-    background-color: #ffffff;
+
+/* Alpine: hide elements (e.g. the image viewer) until Alpine has started */
+[x-cloak] {
+    display: none !important;
 }
 
-/* Hide the old IE/Edge dropdown arrow, just in case */
-.select-clean::-ms-expand {
-    display: none;
-}
-
-/* === Price slider (noUiSlider) custom theme === */
+/* === Price slider (noUiSlider) – uses the theme colours from Website → Branding & theme === */
 
 #price-slider.noUi-target {
     border: none;
@@ -25,119 +17,36 @@
     margin-top: 4px;
 }
 
-/* Track container */
 #price-slider .noUi-connects {
-    border-radius: 9999px; /* full rounded */
-    background: #e5e7eb;   /* gray-200 */
+    border-radius: 9999px;
+    background: #e5e7eb;
     height: 4px;
 }
 
-/* Selected range */
 #price-slider .noUi-connect {
-    background: #fbbf24;   /* amber-400 */
+    background: rgb(var(--color-accent));
 }
 
-/* Handles */
 #price-slider .noUi-handle {
-    width: 14px;
+    width: 18px;
     height: 18px;
-    border-radius: 6px;
-    border: 2px solid #fbbf24; /* amber-400 outline */
-    background: #111827;       /* slate-900 */
-    box-shadow: none;
+    border-radius: 9999px;
+    border: 3px solid rgb(var(--color-accent));
+    background: rgb(var(--color-brand));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
     cursor: pointer;
-    top: -7px;                 /* vertically center over 4px track */
+    top: -7px;
+    right: -9px;
 }
 
-/* Remove default handle decorations */
 #price-slider .noUi-handle:before,
-#price-slider .noUi-handle:after {
-    display: none;
-}
-
-/* Improve touch area without changing visual size */
-#price-slider .noUi-touch-area {
-    cursor: pointer;
-}
-
-/* Optional: hide tooltips if noUiSlider ever adds them */
+#price-slider .noUi-handle:after,
 #price-slider .noUi-tooltip {
     display: none;
 }
 
-/* Basic position for dropdown */
-.main-nav {
-    display: flex;
-    gap: 2rem; /* adjust to match your spacing */
-    align-items: center;
+/* Bigger touch area on phones without changing the look */
+#price-slider .noUi-touch-area {
+    cursor: pointer;
+    margin: -10px;
 }
-
-/* Make sure the list item is the positioning context */
-.nav-categories {
-    position: relative;
-}
-
-/* Hidden by default (desktop) */
-.nav-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 200px;
-    background-color: #101827; /* match your header bg */
-    border-radius: 4px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
-    padding: 0.5rem 0;
-    display: none;
-    z-index: 50;
-}
-
-/* Dropdown items */
-.nav-dropdown-item {
-    display: block;
-    padding: 0.4rem 1rem;
-    color: #fff;
-    text-decoration: none;
-    white-space: nowrap;
-    font-size: 0.95rem;
-}
-
-.nav-dropdown-item:hover {
-    background-color: #1f2937; /* slightly lighter */
-}
-
-/* Show on hover – desktop */
-.nav-categories:hover .nav-dropdown {
-    display: block;
-}
-
-/* MOBILE: make dropdown full-width and stacked nicely */
-@media (max-width: 768px) {
-    .main-nav {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-
-    .nav-categories {
-        width: 100%;
-        position: static; /* so dropdown can be full width */
-    }
-
-    .nav-dropdown {
-        position: static;
-        transform: none;
-        width: 100%;
-        box-shadow: none;
-        border-radius: 0;
-        margin-top: 0.25rem;
-        display: block;           /* always visible on mobile */
-        padding-left: 1.5rem;     /* indent under “Categories” */
-    }
-
-    .nav-dropdown-item {
-        padding: 0.25rem 0;
-    }
-}
-
-

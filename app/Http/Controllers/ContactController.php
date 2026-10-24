@@ -38,10 +38,13 @@ class ContactController extends Controller
         // Validate inputs (basic restrictions)
         $validated = $request->validate([
             'name'    => ['required', 'string', 'max:255'],
-            'email'   => ['required', 'email', 'max:255'],
-            'phone'   => ['nullable', 'string', 'max:50'],
+            'email'   => ['nullable', 'required_without:phone', 'email', 'max:255'],
+            'phone'   => ['nullable', 'required_without:email', 'string', 'max:50'],
             'subject' => ['nullable', 'string', 'max:255'],
             'message' => ['required', 'string', 'min:10', 'max:5000'],
+        ], [
+            'email.required_without' => 'Please give us an email or a phone number so we can reply.',
+            'phone.required_without' => 'Please give us a phone number or an email so we can reply.',
         ]);
 
         // Extra sanitization: strip HTML tags to avoid injection/XSS in stored data & emails
@@ -55,7 +58,7 @@ class ContactController extends Controller
         // Save to DB (using sanitized values)
         $contactMessage = ContactMessage::create([
             'name'       => $sanitized['name'],
-            'email'      => $sanitized['email'],
+            'email'      => $sanitized['email'] ?? null,
             'phone'      => $sanitized['phone'] ?? null,
             'subject'    => $sanitized['subject'] ?? null,
             'message'    => $sanitized['message'],

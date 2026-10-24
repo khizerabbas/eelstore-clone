@@ -91,21 +91,21 @@
 
     {{-- Main header --}}
     <header class="bg-brand text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 md:gap-4">
             {{-- Logo / brand --}}
             <a href="{{ route('home') }}" class="flex items-center gap-2 min-w-0">
                 @if($logoUrl)
-                    <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-10 w-auto max-w-[180px] object-contain">
+                    <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-9 md:h-10 w-auto max-w-[150px] md:max-w-[180px] object-contain">
                 @else
-                    <span class="bg-accent text-on-accent w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full font-extrabold text-lg">
+                    <span class="bg-accent text-on-accent w-9 h-9 md:w-10 md:h-10 flex-shrink-0 flex items-center justify-center rounded-full font-extrabold text-base md:text-lg">
                         {{ content('branding.logo_text') }}
                     </span>
                 @endif
                 @if(content('branding.show_name'))
-                    <span class="leading-tight hidden sm:block">
-                        <span class="block font-bold text-lg tracking-wide">{{ $storeName }}</span>
+                    <span class="leading-tight min-w-0">
+                        <span class="block font-bold text-base md:text-lg tracking-wide truncate">{{ $storeName }}</span>
                         @if(content('branding.tagline'))
-                            <span class="block text-[11px] text-gray-300">{{ content('branding.tagline') }}</span>
+                            <span class="hidden md:block text-[11px] text-gray-300 truncate">{{ content('branding.tagline') }}</span>
                         @endif
                     </span>
                 @endif
@@ -117,7 +117,7 @@
                     name="category"
                     form="header-search-form"
                     aria-label="{{ content('header.search_all_label') }}"
-                    class="bg-white/10 border border-white/20 text-sm rounded-md pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-accent [&>option]:text-gray-900"
+                    class="bg-white/10 border border-white/20 text-sm rounded-md pl-3 pr-8 py-2 max-w-[11rem] focus:outline-none focus:ring-2 focus:ring-accent [&>option]:text-gray-900"
                 >
                     <option value="">{{ content('header.search_all_label') }}</option>
                     @foreach($searchCategories as $cat)
@@ -139,49 +139,50 @@
                         >
                         <button type="submit" aria-label="Search"
                                 class="absolute inset-y-0 right-0 px-3 flex items-center justify-center text-gray-300 hover:text-accent">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                            </svg>
+                            <x-store-icon name="search" class="w-4 h-4"/>
                         </button>
                     </div>
                 </form>
             </div>
 
-            {{-- My orders / wishlist / cart + mobile buttons --}}
-            <div class="flex items-center gap-4">
-                <div class="hidden sm:flex items-center gap-3 text-xs">
-                    @if($showMyOrders)
-                        <a href="{{ route('orders.index') }}" class="flex items-center gap-1 hover:text-accent">
-                            📦 {{ content('header.nav_my_orders') }}
-                        </a>
-                    @endif
-
-                    @if($showWishlist)
-                        <a href="{{ route('wishlist.index') }}" class="flex items-center gap-1 hover:text-accent">
-                            ❤️ {{ content('header.nav_wishlist') }}
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-on-accent text-xs font-semibold" id="wishlist-count">{{ $wishlistCount }}</span>
-                        </a>
-                    @endif
-
-                    <a href="{{ route('cart.index') }}" class="flex items-center gap-1 hover:text-accent">
-                        🛒 {{ content('header.nav_cart') }}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-on-accent text-xs font-semibold" id="cart-count">{{ $cartCount }}</span>
+            {{-- Desktop: my orders / wishlist / cart --}}
+            <div class="hidden md:flex items-center gap-4 text-xs flex-shrink-0">
+                @if($showMyOrders)
+                    <a href="{{ route('orders.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                        <x-store-icon name="box" class="w-5 h-5"/> {{ content('header.nav_my_orders') }}
                     </a>
-                </div>
+                @endif
 
-                <button id="mobile-search-toggle" type="button" aria-label="Search"
-                        class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/10 text-gray-200">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/>
-                    </svg>
+                @if($showWishlist)
+                    <a href="{{ route('wishlist.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                        <x-store-icon name="heart" class="w-5 h-5"/> {{ content('header.nav_wishlist') }}
+                        <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-full bg-accent text-on-accent text-xs font-semibold" id="wishlist-count" data-wishlist-count>{{ $wishlistCount }}</span>
+                    </a>
+                @endif
+
+                <a href="{{ route('cart.index') }}" class="flex items-center gap-1.5 hover:text-accent">
+                    <x-store-icon name="cart" class="w-5 h-5"/> {{ content('header.nav_cart') }}
+                    <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-full bg-accent text-on-accent text-xs font-semibold" id="cart-count" data-cart-count>{{ $cartCount }}</span>
+                </a>
+            </div>
+
+            {{-- Phone / small tablet: search, cart (with count) and menu buttons --}}
+            <div class="flex md:hidden items-center gap-1.5 flex-shrink-0">
+                <button id="mobile-search-toggle" type="button" aria-label="Search" aria-controls="mobile-search-panel" aria-expanded="false"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="search" class="w-5 h-5"/>
                 </button>
 
-                <button id="mobile-menu-toggle" type="button"
-                        class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/10 text-gray-200">
-                    <span class="sr-only">Open main menu</span>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
+                <a href="{{ route('cart.index') }}" aria-label="{{ content('header.nav_cart') }}"
+                   class="relative inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="cart" class="w-5 h-5"/>
+                    <span data-cart-count data-hide-when-empty
+                          class="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-accent text-on-accent text-[11px] font-bold flex items-center justify-center {{ $cartCount ? '' : 'hidden' }}">{{ $cartCount }}</span>
+                </a>
+
+                <button id="mobile-menu-toggle" type="button" aria-label="Open main menu" aria-controls="mobile-menu-panel" aria-expanded="false"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-white/10 text-gray-100">
+                    <x-store-icon name="menu" class="w-5 h-5"/>
                 </button>
             </div>
         </div>
@@ -192,44 +193,59 @@
                 <input type="search" name="q" value="{{ request('q') }}"
                        placeholder="{{ content('header.search_placeholder') }}"
                        aria-label="{{ content('header.search_placeholder') }}"
-                       class="flex-1 bg-white/10 border border-white/20 text-sm rounded-md px-3 py-2 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-accent">
-                <button type="submit" class="px-4 py-2 rounded-md bg-accent text-on-accent text-sm font-semibold">Go</button>
+                       class="flex-1 min-w-0 bg-white/10 border border-white/20 text-base rounded-md px-3 py-2 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-accent">
+                <button type="submit" class="px-4 py-2 rounded-md bg-accent text-on-accent text-sm font-semibold">Search</button>
             </form>
         </div>
 
         {{-- Mobile nav panel --}}
         <div id="mobile-menu-panel" class="md:hidden hidden bg-brand text-gray-100 border-t border-white/10">
-            <div class="px-4 pt-3 pb-4 space-y-3">
-                <a href="{{ route('home') }}" class="block py-1">{{ content('header.nav_home') }}</a>
+            <nav class="px-4 py-2 text-[15px]" aria-label="Mobile">
+                <a href="{{ route('home') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_home') }}</a>
+                <a href="{{ route('shop.index') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_shop') }}</a>
 
-                <details class="border-t border-white/10 pt-3">
-                    <summary class="list-none flex items-center justify-between py-1 cursor-pointer">
+                <details class="border-b border-white/10 group">
+                    <summary class="list-none flex items-center justify-between py-3 cursor-pointer">
                         <span>{{ content('header.nav_categories') }}</span>
-                        <span class="text-xs">▾</span>
+                        <x-store-icon name="chevron-down" class="w-4 h-4 transition group-open:rotate-180"/>
                     </summary>
-                    <div class="mt-2 space-y-1 pl-3 max-h-64 overflow-y-auto text-sm">
+                    <div class="pb-2 pl-3 grid grid-cols-2 gap-x-3 text-sm text-gray-300">
                         @foreach($searchCategories as $category)
-                            <a href="{{ route('category.show', $category->slug) }}" class="block py-1">{{ $category->name }}</a>
+                            <a href="{{ route('category.show', $category->slug) }}" class="py-2 truncate hover:text-accent">{{ $category->name }}</a>
                         @endforeach
                     </div>
                 </details>
 
-                <a href="{{ route('shop.index') }}" class="block py-1">{{ content('header.nav_shop') }}</a>
                 @foreach($extraLinks as $link)
-                    <a href="{{ $link['url'] }}" class="block py-1">{{ $link['label'] }}</a>
+                    <a href="{{ $link['url'] }}" class="flex items-center py-3 border-b border-white/10">{{ $link['label'] }}</a>
                 @endforeach
-                <a href="{{ route('contact.show') }}" class="block py-1">{{ content('header.nav_contact') }}</a>
+                <a href="{{ route('contact.show') }}" class="flex items-center py-3 border-b border-white/10">{{ content('header.nav_contact') }}</a>
 
-                <div class="mt-3 flex flex-wrap items-center gap-4 border-t border-white/10 pt-3 text-sm">
+                <div class="grid {{ [1 => 'grid-cols-1', 2 => 'grid-cols-2', 3 => 'grid-cols-3'][1 + (int) $showMyOrders + (int) $showWishlist] }} gap-2 py-3 text-xs text-center">
                     @if($showMyOrders)
-                        <a href="{{ route('orders.index') }}">📦 {{ content('header.nav_my_orders') }}</a>
+                        <a href="{{ route('orders.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                            <x-store-icon name="box" class="w-5 h-5"/> {{ content('header.nav_my_orders') }}
+                        </a>
                     @endif
                     @if($showWishlist)
-                        <a href="{{ route('wishlist.index') }}">❤️ {{ content('header.nav_wishlist') }} (<span id="wishlist-count-mobile">{{ $wishlistCount }}</span>)</a>
+                        <a href="{{ route('wishlist.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                            <x-store-icon name="heart" class="w-5 h-5"/>
+                            <span>{{ content('header.nav_wishlist') }} (<span id="wishlist-count-mobile" data-wishlist-count>{{ $wishlistCount }}</span>)</span>
+                        </a>
                     @endif
-                    <a href="{{ route('cart.index') }}">🛒 {{ content('header.nav_cart') }} (<span id="cart-count-mobile">{{ $cartCount }}</span>)</a>
+                    <a href="{{ route('cart.index') }}" class="flex flex-col items-center gap-1 rounded-md bg-white/10 py-2.5">
+                        <x-store-icon name="cart" class="w-5 h-5"/>
+                        <span>{{ content('header.nav_cart') }} (<span id="cart-count-mobile" data-cart-count>{{ $cartCount }}</span>)</span>
+                    </a>
                 </div>
-            </div>
+
+                @if($settings->contact_phone)
+                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $settings->contact_phone) }}"
+                       class="mb-2 flex items-center justify-center gap-2 rounded-md bg-accent text-on-accent font-semibold py-2.5 text-sm">
+                        <x-store-icon name="phone" class="w-4 h-4"/> {{ $settings->contact_phone }}
+                    </a>
+                @endif
+            </nav>
         </div>
 
         {{-- Desktop main menu --}}
@@ -269,9 +285,9 @@
 
     {{-- Footer --}}
     <footer class="bg-brand text-gray-300 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 sm:grid-cols-2 {{ $footerPages->isNotEmpty() ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 {{ $footerPages->isNotEmpty() ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-x-6 gap-y-8">
             {{-- About --}}
-            <div>
+            <div class="col-span-2 lg:col-span-1">
                 <div class="flex items-center gap-2 mb-3">
                     @if($logoUrl)
                         <img src="{{ $logoUrl }}" alt="{{ $storeName }}" class="h-10 w-auto max-w-[160px] object-contain">
@@ -325,7 +341,7 @@
             @endif
 
             {{-- Contact (from Store settings) --}}
-            <div>
+            <div class="col-span-2 lg:col-span-1">
                 <h3 class="font-semibold text-sm uppercase tracking-wide mb-3 text-white">{{ content('footer.contact_heading') }}</h3>
                 <ul class="space-y-2 text-sm">
                     @if($settings->contact_phone)

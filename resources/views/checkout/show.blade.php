@@ -28,16 +28,48 @@
         </div>
     </section>
 
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        @php $itemCount = $products->sum('cart_quantity'); @endphp
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {{-- Form --}}
-            <div class="lg:col-span-2">
+            <div class="lg:col-span-2 space-y-4">
+                {{-- Phones: compact order summary above the form (the full one sits in the sidebar on desktop) --}}
+                <details class="lg:hidden bg-white border border-gray-200 rounded-lg group">
+                    <summary class="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                        <span class="text-sm text-slate-800">
+                            <span class="font-semibold">{{ $itemCount }} {{ \Illuminate\Support\Str::plural('item', $itemCount) }}</span>
+                            <span class="text-gray-500">· show details</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 font-bold text-slate-900">
+                            {{ rupees($total) }}
+                            <x-store-icon name="chevron-down" class="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180"/>
+                        </span>
+                    </summary>
+                    <ul class="divide-y divide-gray-100 text-sm border-t border-gray-100 px-4">
+                        @foreach($products as $product)
+                            <li class="py-2 flex justify-between gap-3">
+                                <span class="text-slate-800 min-w-0">{{ $product->name }} <span class="text-xs text-gray-500">× {{ $product->cart_quantity }}</span></span>
+                                <span class="whitespace-nowrap font-medium">{{ rupees($product->cart_subtotal) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="px-4 py-2 border-t border-gray-100 flex justify-between text-xs">
+                        <span class="text-gray-500">{{ \App\Support\Content::text('pages.delivery_note') }}</span>
+                        <a href="{{ route('cart.index') }}" class="text-accent-ink hover:underline whitespace-nowrap ml-3">Edit cart</a>
+                    </div>
+                </details>
+
                 <div class="bg-white border border-gray-100 rounded-lg p-5 sm:p-6">
                     <h2 class="text-base font-semibold text-slate-900 mb-1">Your details</h2>
                     <p class="text-xs text-gray-500 mb-5">
                         Only your name and mobile number are required.
                     </p>
 
+                    @if($errors->any() && ! $errors->has('form'))
+                        <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                            Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+                        </div>
+                    @endif
                     @if($errors->has('form'))
                         <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                             {{ $errors->first('form') }}
@@ -67,10 +99,11 @@
                                     required
                                     maxlength="100"
                                     autocomplete="name"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                    @error('name') aria-invalid="true" aria-describedby="name-error" @enderror
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('name') !border-red-500 bg-red-50/40 @enderror"
                                 >
                                 @error('name')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
 
@@ -88,10 +121,11 @@
                                     inputmode="tel"
                                     autocomplete="tel"
                                     placeholder="0300 1234567"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                    @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('phone') !border-red-500 bg-red-50/40 @enderror"
                                 >
                                 @error('phone')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                         </div>
@@ -107,10 +141,11 @@
                                 value="{{ old('email') }}"
                                 maxlength="150"
                                 autocomplete="email"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('email') !border-red-500 bg-red-50/40 @enderror"
                             >
                             @error('email')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -125,10 +160,11 @@
                                 maxlength="500"
                                 autocomplete="street-address"
                                 placeholder="House, street, area, city"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('address') aria-invalid="true" aria-describedby="address-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('address') !border-red-500 bg-red-50/40 @enderror"
                             >{{ old('address') }}</textarea>
                             @error('address')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="address-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -142,10 +178,11 @@
                                 rows="3"
                                 maxlength="1000"
                                 placeholder="e.g. best time to call, required wire length, delivery instructions…"
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                @error('comment') aria-invalid="true" aria-describedby="comment-error" @enderror
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('comment') !border-red-500 bg-red-50/40 @enderror"
                             >{{ old('comment') }}</textarea>
                             @error('comment')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <p id="comment-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -153,7 +190,7 @@
                             <div>
                                 <div class="cf-turnstile" data-sitekey="{{ config('orders.turnstile.site_key') }}"></div>
                                 @error('cf-turnstile-response')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                <p id="cf-turnstile-response-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                         @endif
@@ -175,7 +212,7 @@
 
             {{-- Summary --}}
             <div class="space-y-4">
-                <div class="bg-white border border-gray-100 rounded-lg p-4">
+                <div class="hidden lg:block bg-white border border-gray-100 rounded-lg p-4 lg:sticky lg:top-4">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="text-sm font-semibold">Order Summary</h2>
                         <a href="{{ route('cart.index') }}" class="text-xs text-accent-ink hover:underline">Edit cart</a>
@@ -188,14 +225,14 @@
                                     {{ $product->name }}
                                     <span class="text-xs text-gray-500">× {{ $product->cart_quantity }}</span>
                                 </span>
-                                <span class="whitespace-nowrap font-medium">Rs {{ number_format($product->cart_subtotal) }}</span>
+                                <span class="whitespace-nowrap font-medium">{{ rupees($product->cart_subtotal) }}</span>
                             </li>
                         @endforeach
                     </ul>
 
                     <div class="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center font-semibold text-sm">
                         <span>Total</span>
-                        <span>Rs {{ number_format($total) }}</span>
+                        <span>{{ rupees($total) }}</span>
                     </div>
                     <p class="mt-1 text-[11px] text-gray-500">{{ \App\Support\Content::text('pages.delivery_note') }}</p>
                 </div>

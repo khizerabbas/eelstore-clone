@@ -163,15 +163,15 @@
                                 @endif
                             </td>
                             <td class="py-2 px-3 text-center">{{ $item->quantity }}</td>
-                            <td class="py-2 px-3 text-right whitespace-nowrap">Rs {{ number_format((float) $item->unit_price) }}</td>
-                            <td class="py-2 pl-3 text-right whitespace-nowrap font-medium">Rs {{ number_format((float) $item->line_total) }}</td>
+                            <td class="py-2 px-3 text-right whitespace-nowrap">{{ rupees((float) $item->unit_price) }}</td>
+                            <td class="py-2 pl-3 text-right whitespace-nowrap font-medium">{{ rupees((float) $item->line_total) }}</td>
                         </tr>
                     @endforeach
                     </tbody>
                     <tfoot>
                     <tr class="border-t border-gray-200 font-semibold">
                         <td class="pt-3" colspan="3">Total (cash on delivery)</td>
-                        <td class="pt-3 text-right whitespace-nowrap">Rs {{ number_format((float) $order->subtotal) }}</td>
+                        <td class="pt-3 text-right whitespace-nowrap">{{ rupees((float) $order->subtotal) }}</td>
                     </tr>
                     </tfoot>
                 </table>

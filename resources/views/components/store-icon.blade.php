@@ -53,6 +53,42 @@
         @case('x')
             <path d="M4 4l16 16M20 4L4 20"/>
             @break
+        @case('cart')
+            <path d="M3 4h2l2.4 10.2a1 1 0 001 .8h8.9a1 1 0 001-.8L20 7H6.2"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>
+            @break
+        @case('heart')
+            <path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/>
+            @break
+        @case('box')
+            <path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>
+            @break
+        @case('search')
+            <circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>
+            @break
+        @case('menu')
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+            @break
+        @case('filter')
+            <path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"/>
+            @break
+        @case('close')
+            <path d="M6 6l12 12M18 6L6 18"/>
+            @break
+        @case('trash')
+            <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>
+            @break
+        @case('plus')
+            <path d="M12 5v14M5 12h14"/>
+            @break
+        @case('minus')
+            <path d="M5 12h14"/>
+            @break
+        @case('chevron-down')
+            <path d="M6 9l6 6 6-6"/>
+            @break
+        @case('arrow-left')
+            <path d="M19 12H5M11 6l-6 6 6 6"/>
+            @break
         @default
             <circle cx="12" cy="12" r="3"/>
     @endswitch

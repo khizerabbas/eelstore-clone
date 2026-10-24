@@ -49,7 +49,7 @@ class ContactMessageResource extends Resource
             ->components([
                 TextEntry::make('name'),
                 TextEntry::make('created_at')->label('Received')->dateTime('d M Y, h:i A'),
-                TextEntry::make('email')->copyable(),
+                TextEntry::make('email')->placeholder('—')->copyable(),
                 TextEntry::make('phone')->placeholder('—')->copyable(),
                 TextEntry::make('subject')->placeholder('—')->columnSpanFull(),
                 TextEntry::make('message')
@@ -72,6 +72,7 @@ class ContactMessageResource extends Resource
                     ->limit(40)
                     ->searchable(),
                 TextColumn::make('email')
+                    ->placeholder('—')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('phone')
@@ -92,10 +93,12 @@ class ContactMessageResource extends Resource
                 ViewAction::make()
                     ->after(fn (ContactMessage $record) => $record->read_at ?: $record->forceFill(['read_at' => now()])->save())
                     ->modalFooterActions(fn (ContactMessage $record) => array_filter([
-                        Action::make('reply')
-                            ->label('Reply by email')
-                            ->icon(Heroicon::OutlinedEnvelope)
-                            ->url('mailto:' . $record->email . '?subject=' . rawurlencode('Re: ' . ($record->subject ?: 'Your message'))),
+                        $record->email
+                            ? Action::make('reply')
+                                ->label('Reply by email')
+                                ->icon(Heroicon::OutlinedEnvelope)
+                                ->url('mailto:' . $record->email . '?subject=' . rawurlencode('Re: ' . ($record->subject ?: 'Your message')))
+                            : null,
                         ($phone = PakistaniPhone::normalize($record->phone))
                             ? Action::make('whatsapp')
                                 ->label('WhatsApp')

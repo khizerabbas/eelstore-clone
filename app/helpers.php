@@ -9,3 +9,11 @@ if (! function_exists('content')) {
         return Content::get($key, $default);
     }
 }
+
+if (! function_exists('rupees')) {
+    // Prices on the storefront: "Rs 2,200" (no decimals – PKR prices are whole rupees)
+    function rupees(int|float|string|null $amount): string
+    {
+        return 'Rs ' . number_format(round((float) $amount));
+    }
+}

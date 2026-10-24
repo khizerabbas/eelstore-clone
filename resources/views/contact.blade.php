@@ -21,8 +21,8 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Call Us</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            📞
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="phone" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold">
@@ -44,8 +44,8 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Email</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            ✉️
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="mail" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold">
@@ -67,15 +67,14 @@
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 mb-3">Store Location</h2>
                     <div class="flex items-start gap-3 text-sm text-gray-700">
-                        <div class="w-9 h-9 rounded-full bg-brand text-accent flex items-center justify-center text-lg">
-                            📍
+                        <div class="w-9 h-9 flex-shrink-0 rounded-full bg-brand text-accent flex items-center justify-center">
+                            <x-store-icon name="location" class="w-4 h-4"/>
                         </div>
                         <div>
                             <div class="font-semibold mb-1">
                                 {{ $settings->store_name }}
                             </div>
-                            <div class="text-xs text-gray-600 whitespace-pre-line">
-                                {{ $settings->store_address }}
+                            <div class="text-xs text-gray-600 whitespace-pre-line">{{ $settings->store_address }}
                             </div>
                         </div>
                     </div>
@@ -84,9 +83,14 @@
 
             {{-- Right: contact form --}}
             <div class="lg:col-span-2">
-                <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-6">
+                <div class="bg-white border border-gray-100 rounded-lg shadow-sm p-5 sm:p-6">
                     <h2 class="text-lg font-semibold mb-4">Send us a message</h2>
 
+                    @if($errors->any() && ! $errors->has('form'))
+                    <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                        Please check the highlighted {{ \Illuminate\Support\Str::plural('field', $errors->count()) }} below.
+                    </div>
+                    @endif
                     @if($errors->has('form'))
                         <div class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                             {{ $errors->first('form') }}
@@ -99,102 +103,83 @@
                         </div>
                     @endif
 
-                    <form action="{{ route('contact.submit') }}" method="POST" class="space-y-4">
+                    <form action="{{ route('contact.submit') }}" method="POST" class="space-y-4" data-disable-on-submit>
                         @csrf
 
                         {{-- Honeypot field --}}
-                        <div style="display:none;">
+                        <div style="display:none;" aria-hidden="true">
                             <label>Website
-                                <input type="text" name="website" autocomplete="off">
+                                <input type="text" name="website" tabindex="-1" autocomplete="off">
                             </label>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Name <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value="{{ old('name') }}"
-                                    required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('name')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Email <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value="{{ old('email') }}"
-                                    required
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('email')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Phone
-                                </label>
-                                <input
-                                    type="text"
-                                    name="phone"
-                                    value="{{ old('phone') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('phone')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                    Subject
-                                </label>
-                                <input
-                                    type="text"
-                                    name="subject"
-                                    value="{{ old('subject') }}"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                >
-                                @error('subject')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                Message <span class="text-red-500">*</span>
+                            <label for="contact-name" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Name <span class="text-red-500">*</span>
                             </label>
-                            <textarea
-                                name="message"
-                                rows="5"
-                                required
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                            >{{ old('message') }}</textarea>
-                            @error('message')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            <input id="contact-name" type="text" name="name" value="{{ old('name') }}" required maxlength="255" autocomplete="name"
+                                   @error('name') aria-invalid="true" aria-describedby="name-error" @enderror
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('name') !border-red-500 bg-red-50/40 @enderror">
+                            @error('name')
+                            <p id="name-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="contact-phone" class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Phone / WhatsApp
+                                </label>
+                                <input id="contact-phone" type="tel" name="phone" value="{{ old('phone') }}" maxlength="50" inputmode="tel" autocomplete="tel"
+                                       placeholder="0300 1234567"
+                                       @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('phone') !border-red-500 bg-red-50/40 @enderror">
+                                @error('phone')
+                                <p id="phone-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label for="contact-email" class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Email
+                                </label>
+                                <input id="contact-email" type="email" name="email" value="{{ old('email') }}" maxlength="255" autocomplete="email"
+                                       @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('email') !border-red-500 bg-red-50/40 @enderror">
+                                @error('email')
+                                <p id="email-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <p class="sm:col-span-2 -mt-2 text-[11px] text-gray-500">Give us a phone number or an email (or both) so we can reply.</p>
+                        </div>
+
+                        <div>
+                            <label for="contact-subject" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Subject <span class="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input id="contact-subject" type="text" name="subject" value="{{ old('subject') }}" maxlength="255"
+                                   @error('subject') aria-invalid="true" aria-describedby="subject-error" @enderror
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('subject') !border-red-500 bg-red-50/40 @enderror">
+                            @error('subject')
+                            <p id="subject-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div>
-                            <button
-                                type="submit"
-                                class="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90"
-                            >
+                            <label for="contact-message" class="block text-xs font-semibold text-gray-700 mb-1">
+                                Message <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="contact-message" name="message" rows="5" required minlength="10" maxlength="5000"
+                                      @error('message') aria-invalid="true" aria-describedby="message-error" @enderror
+                                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent @error('message') !border-red-500 bg-red-50/40 @enderror">{{ old('message') }}</textarea>
+                            @error('message')
+                            <p id="message-error" class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <button type="submit"
+                                    class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90 disabled:opacity-60 disabled:cursor-wait">
                                 {{ \App\Support\Content::text('pages.contact_button') }}
                             </button>
                         </div>
@@ -224,7 +209,7 @@
             @elseif($settings->map_embed_url && str_starts_with($settings->map_embed_url, 'https://'))
                 <a href="{{ $settings->map_embed_url }}" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-brand text-white text-sm font-semibold hover:bg-brand/90">
-                    📍 Open our location in Google Maps
+                    <x-store-icon name="location" class="w-4 h-4"/> Open our location in Google Maps
                 </a>
             @endif
 
@@ -248,7 +233,6 @@
                     @endforeach
                 </div>
             @endif
-            </div>
         </div>
     </section>
 @endsection
