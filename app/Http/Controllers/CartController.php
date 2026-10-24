@@ -32,6 +32,7 @@ class CartController extends Controller
                 'success'    => true,
                 'message'    => 'Product added to cart',
                 'cart_count' => $cartCount,
+                'product'    => ['id' => $product->id, 'name' => $product->name, 'price' => $product->getDisplayPrice(), 'quantity' => $quantity],
             ]);
         }
 

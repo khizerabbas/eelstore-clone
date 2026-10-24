@@ -58,6 +58,7 @@
         <link rel="icon" href="{{ $faviconUrl }}">
     @endif
     @stack('meta')
+    @include('partials.analytics')
 
     <style>{!! \App\Support\Theme::cssVariables() !!}</style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -364,5 +365,6 @@
         </div>
     </footer>
 </div>
+@stack('scripts')
 </body>
 </html>

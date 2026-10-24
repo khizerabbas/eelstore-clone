@@ -48,6 +48,23 @@ class SeoSettings extends ContentPage
                         ->maxLength(100)
                         ->regex('/^[A-Za-z0-9_\-]*$/'),
                 ]),
+            Section::make('Analytics & ads tracking')
+                ->description('Optional. Leave empty to switch tracking off. Tracks: add to cart, checkout opened, order request sent (with value) and quote request sent.')
+                ->columns(2)
+                ->schema([
+                    TextInput::make('seo.ga4_id')
+                        ->label('Google Analytics 4 measurement ID')
+                        ->placeholder('G-XXXXXXXXXX')
+                        ->regex('/^G-[A-Z0-9]{4,20}$/')
+                        ->validationMessages(['regex' => 'Use the measurement ID that starts with G- (Admin → Data streams in Google Analytics).'])
+                        ->maxLength(24),
+                    TextInput::make('seo.meta_pixel_id')
+                        ->label('Meta (Facebook / Instagram) Pixel ID')
+                        ->placeholder('1234567890123456')
+                        ->regex('/^\d{6,20}$/')
+                        ->validationMessages(['regex' => 'The Pixel ID is a number (Events Manager → Data sources).'])
+                        ->maxLength(20),
+                ]),
             Section::make('Sharing')
                 ->schema([
                     Fields::image('seo.share_image', 'branding', 'Share image')

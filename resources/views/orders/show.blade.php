@@ -14,6 +14,18 @@
     $isCancelled   = $order->status === OrderStatus::Cancelled;
 @endphp
 
+@if(session('order_placed'))
+    @push('scripts')
+        <script>
+            window.ueTrack('lead', {
+                kind: 'order_request',
+                value: @js((float) $order->subtotal),
+                items: @js($order->items->map(fn ($i) => ['id' => $i->product_id, 'name' => $i->product_name, 'price' => (float) $i->unit_price, 'quantity' => $i->quantity])->values()),
+            });
+        </script>
+    @endpush
+@endif
+
 @section('content')
     <section class="bg-brand text-white">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-3">

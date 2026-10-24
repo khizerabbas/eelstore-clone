@@ -200,6 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
+            if (type === 'cart' && data.product && typeof window.ueTrack === 'function') {
+                window.ueTrack('add_to_cart', {
+                    value: data.product.price * data.product.quantity,
+                    items: [data.product],
+                });
+            }
+
             // Update counts in header if present
             if (type === 'cart' && typeof data.cart_count !== 'undefined') {
                 const val = data.cart_count;

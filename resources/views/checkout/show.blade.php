@@ -9,6 +9,15 @@
     @endif
 @endpush
 
+@push('scripts')
+    <script>
+        window.ueTrack('begin_checkout', {
+            value: @js((float) $total),
+            items: @js($products->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'price' => (float) $p->cart_price, 'quantity' => $p->cart_quantity])->values()),
+        });
+    </script>
+@endpush
+
 @section('content')
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

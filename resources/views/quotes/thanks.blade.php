@@ -8,6 +8,12 @@
     <meta name="robots" content="noindex, nofollow">
 @endpush
 
+@if($reference)
+    @push('scripts')
+        <script>window.ueTrack('lead', { kind: 'quote_request', value: 0 });</script>
+    @endpush
+@endif
+
 @section('content')
     @php
         $storeWhatsApp = \App\Models\SiteSetting::current()->whatsappLink(

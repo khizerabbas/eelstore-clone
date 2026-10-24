@@ -165,5 +165,7 @@ return [
         'meta_description'  => 'Buy genuine electrical supplies online – wires, cables, lighting, switches and accessories. Order online and pay cash on delivery.',
         'share_image'       => null,  // image used when links are shared on WhatsApp/Facebook
         'google_site_verification' => '',
+        'ga4_id'            => '',    // Google Analytics 4 measurement ID, e.g. G-ABC123XYZ (empty = off)
+        'meta_pixel_id'     => '',    // Meta (Facebook/Instagram) Pixel ID (empty = off)
     ],
 ];
