@@ -185,6 +185,10 @@ Cart → /checkout (name*, phone*, email, address, comment)
 - `composer audit` / `npm audit`, DB backups (`spatie/laravel-backup`), error monitoring, and a queue worker plus scheduler (cron on shared hosting).
 - Cleanup: remove `welcome.blade.php` and the leftover Breeze customer views.
 
+> **Launch prep done (2026-10-24):** product CSV/Excel import & export, `app:launch-cleanup`, forgiving search
+> (2.5mm = 2.5 mm), weekly dashboard charts, "new error" alert emails, Content-Security-Policy, nightly backups with an admin
+> Backups page, optional GA4 / Meta Pixel. Skipped for now: emailing customers on status changes.
+
 > **Deployment:** the complete first-launch checklist (server, php.ini, `.env`, cron, commands, clean-up) is in [docs/GO_LIVE.md](GO_LIVE.md).
 
 ## 6. Local setup (current)

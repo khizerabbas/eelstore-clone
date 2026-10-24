@@ -33,7 +33,9 @@ Work through it top to bottom. Tick each box as you go.
 - [ ] **MySQL 8 / MariaDB 10.4+**, database charset `utf8mb4`, collation `utf8mb4_unicode_ci`.
 - [ ] **Apache with `mod_rewrite`** (and ideally `mod_headers`). LiteSpeed works with the same `.htaccess`. Nginx needs its own config (ask before using Nginx).
 - [ ] **Composer 2** on the server, or upload the `vendor/` folder built locally (see §4).
-- [ ] **Cron jobs** available (cPanel → Cron Jobs). Needed for emails/WhatsApp (§6).
+- [ ] **Cron jobs** available (cPanel → Cron Jobs). Needed for emails/WhatsApp, product imports/exports and nightly backups (§6).
+- [ ] **`mysqldump`** available to PHP (it is on almost every host). Needed for the nightly database backup.
+  If backups fail with "mysqldump not found", set `DB_DUMP_BINARY_PATH` to the folder that contains it (§5).
 - [ ] **SSL certificate** (free AutoSSL / Let's Encrypt in cPanel).
 
 ## 2. php.ini settings (server)
@@ -76,6 +78,7 @@ Set in cPanel → *Select PHP Version → Options* / *MultiPHP INI Editor*, or i
 Deploy with Git (preferred) or upload a ZIP. **Do not upload:**
 - [ ] `.env` from your computer (create a fresh one on the server, §5)
 - [ ] `public/hot` – **important**: if this file exists on the server the site tries to load CSS/JS from `localhost:5173` and looks completely broken
+  (it is created by `npm run dev` on your computer and left behind when the dev server stops – delete it before uploading; this also breaks the local site)
 - [ ] `public/storage` (it's a link, created on the server), `storage/logs/*`, `node_modules/`, `.idea/`, `database/database.sqlite`
 
 **Build assets** (`public/build` is not in Git):
@@ -136,6 +139,16 @@ ADMIN_REQUIRE_2FA=true                   # every admin must set up an authentica
 ERROR_LOG_ENABLED=true                   # save errors to the database (Admin → Settings → Error log)
 ERROR_LOG_RETENTION_DAYS=30              # errors not seen for this many days are deleted automatically
 ERROR_LOG_HTTP_STATUSES=419,429          # also record "page expired" and rate limits (add 404 only to debug broken links)
+ERROR_ALERT_EMAIL=                       # who gets "new error" emails (empty = ORDER_ADMIN_EMAIL)
+ERROR_ALERTS_ENABLED=true
+
+CSP_ENABLED=true                         # Content-Security-Policy header (violations go to the Error log)
+CSP_REPORT_ONLY=false                    # true = report problems but block nothing (temporary troubleshooting only)
+
+BACKUP_NOTIFY_EMAIL=                     # who gets "backup failed" emails (empty = ORDER_ADMIN_EMAIL)
+BACKUP_ARCHIVE_PASSWORD=                 # recommended: password-protects backup zips (store it offline – needed to restore!)
+BACKUP_MAX_MB=3000                       # oldest backups are deleted above this total size
+DB_DUMP_BINARY_PATH=                     # only if mysqldump isn't found, e.g. /usr/bin
 SEED_ADMIN_EMAIL=                        # leave EMPTY in production
 SEED_ADMIN_PASSWORD=                     # leave EMPTY in production
 ```
@@ -151,7 +164,10 @@ php artisan storage:link                 # makes uploaded images visible at /sto
 php artisan filament:assets              # admin panel CSS/JS into public/
 php artisan app:create-admin             # first Owner account (asks name, email, strong password)
 php artisan app:optimize-images          # WebP copies for any images already uploaded
+php artisan app:launch-cleanup --dry-run # shows demo/test data that would be removed (see §8)
+php artisan app:launch-cleanup           # removes it – pick sections, confirm
 php artisan optimize                     # cache config, routes, views (run again after every .env change)
+php artisan backup:run                   # first backup straight away (then nightly via cron)
 ```
 
 - `storage:link` fails on some shared hosts (symlinks disabled): ask support to create
@@ -163,8 +179,12 @@ cPanel → Cron Jobs → "Once per minute":
 * * * * * cd /home/USER/usman-electronics && php artisan schedule:run >> /dev/null 2>&1
 ```
 (Use the full PHP path if needed, e.g. `/usr/local/bin/php` or `/opt/cpanel/ea-php82/root/usr/bin/php`.)
-The scheduler starts the queue worker every minute, and daily removes failed jobs older than 30 days and activity-log entries older than a year.
-**Without this cron line, order emails and WhatsApp alerts are never sent** (they wait in the `jobs` table).
+The scheduler:
+- starts the queue worker every minute (order/quote emails, WhatsApp alerts, error alert emails, **product imports/exports**),
+- makes a **backup** every night at 01:30 (cleanup at 01:00, health check at 03:00),
+- daily removes failed jobs older than 30 days, activity-log entries older than a year and error-log entries not seen for 30 days.
+
+**Without this cron line, emails and WhatsApp alerts are never sent, imports never finish and no backups are made.**
 
 > VPS alternative: run `php artisan queue:work --tries=3` under Supervisor and set `QUEUE_WORKER_VIA_SCHEDULER=false` (still keep the cron line).
 
@@ -188,17 +208,18 @@ The scheduler starts the queue worker every minute, and daily removes failed job
 - [ ] **Catalog → Brands**: upload brand logos (used in "Shop by brand" and on brand pages).
 - [ ] **Website → Home slider**: upload real slides (about 1600 × 600 px).
 - [ ] **Website → Content pages**: create at least *About us*, *Delivery & Cash on Delivery*, *Returns & warranty*, *Privacy policy*.
+- [ ] **Catalog → Products → Import**: download the example CSV from the import window, fill it in Excel (one row per product;
+  category and brand by name), save as **CSV**, upload. Import runs in the background (cron) – the bell icon shows the result,
+  and failed rows can be downloaded with the reason. **Export** gives a CSV/Excel copy you can edit (e.g. prices) and import back.
 - [ ] **Catalog**: real categories, brands and products with images. For wires/cables sold in several coil sizes, give every size
   the same **Size group** (e.g. `7/29 wire`) and a **Size label** (e.g. `90 m`) so they link to each other as "Other sizes";
   add a **Note for customers** where useful (e.g. "Custom lengths available – mention it in the order comment").
 
 ### Demo / test data to remove before launch
-Only relevant if you copy the local database or run the seeders:
-- [ ] Demo products/companies ("Company A", "Company B", "1 Pair Wire (Company A)" …) from the seeders.
-- [ ] Test order **UE-100001** ("Test Customer").
-- [ ] Placeholder contact email `info@example.com` and contact recipient `test@test.com` (Store & contact).
-- [ ] The old hero subtitle "We're building a Laravel-powered clone of eelstore.pk…" (Website → Home page).
-- [ ] Slider rows pointing to `storage/hero/slide1-3.jpg` (those files don't exist).
+Run `php artisan app:launch-cleanup --dry-run` to see what's there, then `php artisan app:launch-cleanup` to remove it.
+It handles: demo products/brands from the seeders (with images), test orders (e.g. **UE-100001**), test quote requests (with files),
+contact messages, logs and queues, placeholder emails (`info@example.com`, `test@test.com`), the old "Laravel-powered clone" hero
+text and slider rows whose image files don't exist. **Categories and admin users are kept.** Run it again after your own test orders (§10).
 
 ## 9. SEO after launch
 
@@ -224,12 +245,22 @@ Only relevant if you copy the local database or run the seeders:
 - [ ] Upload a product image in the admin → it shows on the site (WebP copy created).
 - [ ] `https://YOUR-DOMAIN.pk/admin` requires login + 2FA.
 - [ ] Response headers include `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security` (browser dev tools → Network).
-- [ ] Delete the test order afterwards (Owner can delete).
+- [ ] Search: try "2.5mm" and "2.5 mm" – both should find the same products.
+- [ ] Admin dashboard shows the weekly charts; Settings → Backups lists the backup made in §6.
+- [ ] Import 2–3 products from a CSV → bell icon reports success within ~1 minute (cron).
+- [ ] Response headers also include `Content-Security-Policy`; after clicking around the site and admin,
+  Settings → Error log shows **no "CSP violation"** entries.
+- [ ] (If analytics IDs are set) GA4 Realtime / Meta Events Manager shows the visit and the test order as a lead.
+- [ ] Remove the test orders/quotes: `php artisan app:launch-cleanup` (choose only those sections).
 
 ## 11. Backups & monitoring
 
-- [ ] Enable the host's daily backups (files **and** database). Keep at least 7 days.
-- [ ] Also back up `storage/app/public/` (uploaded images), `storage/app/private/` (customers' quote files) and the `.env` file (store it somewhere safe, offline).
+- [ ] **Built-in backups**: every night the database + `storage/app/public` + `storage/app/private` are zipped into `storage/app/backups`
+  (old ones removed automatically; "backup failed" emails go to `BACKUP_NOTIFY_EMAIL`). **Admin → Settings → Backups**: download one
+  **every week** and keep it off the server (Google Drive / USB) – a backup on the same server doesn't help if the server is lost.
+- [ ] Set `BACKUP_ARCHIVE_PASSWORD` and keep that password, the `.env` file and the `APP_KEY` somewhere safe offline – all three are needed to restore.
+- [ ] Also enable the host's own daily backups if offered (belt and braces).
+- [ ] Restore (if ever needed): unzip → import `db-dumps/*.sql` into MySQL → copy `public/` and `private/` back into `storage/app/` → `php artisan app:optimize-images`.
 - [ ] Errors are saved in **Admin → Settings → Error log** (server crashes, failed emails/WhatsApp, expired pages, visitors' browser errors).
   `storage/logs/laravel.log` still has the raw details.
 
@@ -268,3 +299,10 @@ php artisan up
 | 2026-10-24 | Browser error reports endpoint `POST /client-errors` (CSRF-exempt, rate-limited) | Nothing – must not be blocked by a firewall/WAF rule |
 | 2026-10-24 | Product page helpers: other sizes, customer note, "Ask on WhatsApp" | `migrate` (3 new product columns) |
 | 2026-10-24 | Bulk quote requests `/bulk-quote` with photo/PDF upload (private disk) | `migrate`; `storage/app/private` writable + backed up; uploads ≤ 10 MB (php.ini §2 already covers it) |
+| 2026-10-24 | Product import/export (CSV / Excel) + admin notification bell | `migrate` (imports, exports, failed_import_rows, notifications); cron runs the import jobs |
+| 2026-10-24 | `app:launch-cleanup` command; fresh installs have no placeholder emails | Run before launch (§6, §8) |
+| 2026-10-24 | Better search (2.5mm = 2.5 mm), weekly dashboard charts | Nothing extra |
+| 2026-10-24 | "New error" alert emails | Optional `ERROR_ALERT_EMAIL`, `ERROR_ALERTS_ENABLED` |
+| 2026-10-24 | Content-Security-Policy + `POST /csp-report` | `CSP_ENABLED`, `CSP_REPORT_ONLY`; endpoint must not be blocked by a firewall |
+| 2026-10-24 | Nightly backups (spatie/laravel-backup 9) + Admin → Settings → Backups | `mysqldump`; `BACKUP_*`, `DB_DUMP_BINARY_PATH`; cron line; `php artisan backup:run` once |
+| 2026-10-24 | Optional GA4 / Meta Pixel (Website → SEO) | Nothing on the server; add IDs in the admin when ready |
