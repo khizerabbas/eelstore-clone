@@ -29,7 +29,7 @@
                 @if(count($images))
                     <div x-data="{ active: @js($images[0]) }">
                         <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
-                            <img :src="active" src="{{ $images[0] }}" alt="{{ $product->name }}" class="w-full h-full object-contain">
+                            <x-store-image :src="$images[0]" :alt="$product->name" :lazy="false" x-bind:src="active" class="w-full h-full object-contain"/>
                         </div>
                         @if(count($images) > 1)
                             <div class="flex flex-wrap gap-2">
@@ -37,15 +37,15 @@
                                     <button type="button" x-on:click="active = @js($image)"
                                             class="w-16 h-16 rounded-md border overflow-hidden bg-white"
                                             :class="active === @js($image) ? 'border-accent ring-2 ring-accent' : 'border-gray-200'">
-                                        <img src="{{ $image }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
+                                        <x-store-image :src="$image" :alt="$product->name" class="w-full h-full object-contain"/>
                                     </button>
                                 @endforeach
                             </div>
                         @endif
                     </div>
                 @else
-                    <div class="bg-slate-50 border border-gray-200 rounded-lg h-72 flex items-center justify-center mb-3">
-                        <x-store-icon name="bolt" class="w-16 h-16 text-slate-300"/>
+                    <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
+                        <x-store-image :alt="$product->name" :lazy="false" class="w-full h-full object-contain"/>
                     </div>
                 @endif
             </div>

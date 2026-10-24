@@ -62,7 +62,14 @@ class Content
     {
         $path = self::get($key);
 
-        return $path ? Storage::disk('public')->url($path) : null;
+        // Missing file → null, so callers fall back (logo letters, placeholder …) instead of a broken image
+        return $path && Storage::disk('public')->exists($path) ? Storage::disk('public')->url($path) : null;
+    }
+
+    // Image shown when a picture is missing or fails to load (custom upload or the bundled "No preview available")
+    public static function placeholderUrl(): string
+    {
+        return self::imageUrl('branding.placeholder_image') ?? asset('images/no-preview.svg');
     }
 
     // All values of one group (defaults merged with stored), keyed without the group prefix

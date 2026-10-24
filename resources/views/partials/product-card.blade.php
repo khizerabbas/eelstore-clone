@@ -47,11 +47,7 @@
     {{-- Product image / placeholder --}}
     <a href="{{ route('product.show', ['slug' => $product->slug, 'from' => 'shop']) }}"
        class="block w-full bg-slate-50 h-40 sm:h-44 flex items-center justify-center overflow-hidden">
-        @if($product->imageUrl())
-            <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
-        @else
-            <x-store-icon name="bolt" class="w-10 h-10 text-slate-300"/>
-        @endif
+        <x-store-image :src="$product->imageUrl()" :alt="$product->name" class="w-full h-full object-contain"/>
     </a>
 
     {{-- Text content --}}

@@ -30,6 +30,7 @@ class ProductsTable
             ->defaultSort('updated_at', 'desc')
             ->columns([
                 ImageColumn::make('image')
+                    ->defaultImageUrl(fn () => \App\Support\Content::placeholderUrl())
                     ->label('')
                     ->disk('public')
                     ->square()

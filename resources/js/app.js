@@ -256,6 +256,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+// Broken/missing images → show the "No preview available" placeholder (see components/store-image.blade.php)
+const useImageFallback = (img) => {
+    const fallback = img.dataset.fallback;
+
+    if (fallback && img.getAttribute('src') !== fallback) {
+        img.src = fallback;
+    }
+};
+
+document.addEventListener('error', (event) => {
+    if (event.target instanceof HTMLImageElement) {
+        useImageFallback(event.target);
+    }
+}, true);
+
+// Images that already failed before this script loaded
+document.querySelectorAll('img[data-fallback]').forEach((img) => {
+    if (img.complete && img.naturalWidth === 0) {
+        useImageFallback(img);
+    }
+});
+
 // Prevent double submission (e.g. checkout): disable the submit button once the form is sent
 document.addEventListener('submit', (event) => {
     const form = event.target;

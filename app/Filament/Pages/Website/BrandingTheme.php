@@ -44,6 +44,9 @@ class BrandingTheme extends ContentPage
                         ->maxLength(80),
                     Toggle::make('branding.show_name')
                         ->label('Show the store name next to the logo'),
+                    Fields::image('branding.placeholder_image', 'branding', 'Placeholder image (optional)')
+                        ->helperText('Shown wherever a product or slide has no image, or an image fails to load. Leave empty to use the built-in "No preview available" image.')
+                        ->columnSpanFull(),
                 ]),
             Section::make('Colours')
                 ->description('Changes apply to the whole website instantly.')

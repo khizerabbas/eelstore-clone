@@ -199,6 +199,32 @@ class WebsiteContentTest extends TestCase
         $this->assertSame(config('site_content.seo.home_title'), content('seo.home_title'));
     }
 
+    public function test_missing_images_use_the_placeholder(): void
+    {
+        $category = \App\Models\Category::create(['name' => 'Lighting', 'slug' => 'lighting']);
+        \App\Models\Product::create(['category_id' => $category->id, 'name' => 'LED Bulb', 'slug' => 'led-bulb', 'price' => 300]);
+
+        $placeholder = asset('images/no-preview.svg');
+
+        // No image set → placeholder image (not an empty box)
+        $this->get('/shop')->assertSee('src="' . $placeholder . '"', false);
+        $this->get('/product/led-bulb')->assertSee('src="' . $placeholder . '"', false);
+
+        // Every image carries the fallback for files that fail to load
+        $this->get('/product/led-bulb')->assertSee('data-fallback="' . $placeholder . '"', false);
+
+        // Hero without slides shows the placeholder too
+        $this->get('/')->assertSee('src="' . $placeholder . '"', false);
+    }
+
+    public function test_logo_with_missing_file_falls_back_to_letters(): void
+    {
+        Content::saveGroup('branding', ['logo' => 'branding/does-not-exist.png', 'logo_text' => 'UE']);
+
+        $this->assertNull(Content::imageUrl('branding.logo'));
+        $this->get('/')->assertDontSee('does-not-exist.png');
+    }
+
     public function test_seo_tags_are_rendered(): void
     {
         $this->get('/')

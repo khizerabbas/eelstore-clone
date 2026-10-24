@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" role="img" aria-label="No preview available">
+  <rect width="800" height="600" fill="#f1f5f9"/>
+  <rect x="24" y="24" width="752" height="552" rx="24" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-dasharray="18 14"/>
+  <g transform="translate(310 190)" fill="none" stroke="#94a3b8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="180" height="140" rx="18"/>
+    <circle cx="52" cy="46" r="16"/>
+    <path d="M10 124 L68 70 L108 106 L132 84 L172 124"/>
+  </g>
+  <text x="400" y="400" text-anchor="middle" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#64748b">No preview available</text>
+  <text x="400" y="442" text-anchor="middle" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="22" fill="#94a3b8">Image coming soon</text>
+</svg>

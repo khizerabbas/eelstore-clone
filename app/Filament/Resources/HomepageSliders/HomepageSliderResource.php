@@ -60,6 +60,7 @@ class HomepageSliderResource extends Resource
             ->reorderable('sort_order')
             ->columns([
                 ImageColumn::make('image_path')
+                    ->defaultImageUrl(fn () => \App\Support\Content::placeholderUrl())
                     ->label('Slide')
                     ->state(fn (HomepageSlider $record) => $record->imageUrl())
                     ->imageHeight(56),

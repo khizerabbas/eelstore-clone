@@ -14,6 +14,7 @@ return [
         'show_name'        => true,   // show the store name next to the logo
         'tagline'          => 'Solutions for Every Electrical Need',
         'favicon'          => null,
+        'placeholder_image' => null, // shown when a product/slide has no image; empty = built-in "No preview available"
         'brand_color'      => '#0f172a', // header, footer, dark buttons (needs white text to be readable)
         'accent_color'     => '#fbbf24', // highlights, badges, main buttons
         'page_background'  => '#f3f4f6',

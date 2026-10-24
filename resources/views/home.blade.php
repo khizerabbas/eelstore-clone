@@ -54,23 +54,18 @@
                                 <div class="absolute inset-0 transition-opacity duration-700 ease-in-out
                                             {{ $index === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none' }}"
                                      data-hero-slide>
-                                    <img src="{{ $slide->imageUrl() }}"
-                                         alt="{{ $slide->title ?: Content::text('home.hero_title') }}"
-                                         class="w-full h-full object-cover"
-                                         @if($index > 0) loading="lazy" @endif>
+                                    <x-store-image :src="$slide->imageUrl()"
+                                                   :alt="$slide->title ?: Content::text('home.hero_title')"
+                                                   :lazy="$index > 0"
+                                                   class="w-full h-full object-cover"/>
                                 </div>
                             @endforeach
                         @else
-                            <div class="absolute inset-0 flex items-center justify-center p-6">
-                                <div class="text-center">
-                                    <div class="mx-auto mb-4 w-12 h-12 rounded-full bg-accent/90 text-on-accent flex items-center justify-center">
-                                        <x-store-icon name="bolt" class="w-6 h-6"/>
-                                    </div>
-                                    @if(content('home.hero_empty_text'))
-                                        <p class="text-sm text-white/80">{{ Content::text('home.hero_empty_text') }}</p>
-                                    @endif
-                                </div>
-                            </div>
+                            {{-- No slides yet: placeholder image (+ optional text from Website → Home page) --}}
+                            <x-store-image :alt="Content::text('home.hero_title')" :lazy="false" class="absolute inset-0 w-full h-full object-cover"/>
+                            @if(content('home.hero_empty_text'))
+                                <p class="absolute inset-x-0 bottom-4 text-center text-sm text-slate-600 px-6">{{ Content::text('home.hero_empty_text') }}</p>
+                            @endif
                         @endif
                     </div>
 

@@ -37,11 +37,7 @@
                     @foreach($products as $product)
                         <div class="bg-white border border-gray-100 rounded-lg p-4 flex gap-4 items-start">
                             <div class="w-20 h-20 bg-slate-50 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
-                                @if($product->imageUrl())
-                                    <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-contain">
-                                @else
-                                    <x-store-icon name="bolt" class="w-8 h-8 text-slate-300"/>
-                                @endif
+                                <x-store-image :src="$product->imageUrl()" :alt="$product->name" class="w-full h-full object-contain"/>
                             </div>
                             <div class="flex-1">
                                 <div class="flex justify-between gap-4">

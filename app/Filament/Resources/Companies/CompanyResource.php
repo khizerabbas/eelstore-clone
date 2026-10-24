@@ -59,6 +59,7 @@ class CompanyResource extends Resource
             ->modifyQueryUsing(fn ($query) => $query->withCount('products'))
             ->columns([
                 ImageColumn::make('logo')
+                    ->defaultImageUrl(fn () => \App\Support\Content::placeholderUrl())
                     ->label('')
                     ->disk('public')
                     ->imageHeight(32),

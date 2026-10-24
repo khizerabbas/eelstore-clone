@@ -19,6 +19,7 @@ class CategoriesTable
             ->modifyQueryUsing(fn ($query) => $query->withCount('products'))
             ->columns([
                 ImageColumn::make('image')
+                    ->defaultImageUrl(fn () => \App\Support\Content::placeholderUrl())
                     ->label('')
                     ->disk('public')
                     ->square()
