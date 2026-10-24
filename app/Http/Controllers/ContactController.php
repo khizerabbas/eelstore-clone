@@ -50,7 +50,7 @@ class ContactController extends Controller
         }, $validated);
 
         $settings = SiteSetting::current();
-        $recipient = $settings->contact_recipient_email ?: 'test@test.com';
+        $recipient = $settings->contact_recipient_email ?: config('orders.admin_email');
 
         // Save to DB (using sanitized values)
         $contactMessage = ContactMessage::create([
@@ -64,11 +64,14 @@ class ContactController extends Controller
         ]);
 
         // Send email (safe, escaped output in the mailable view)
-        try {
-            Mail::to($recipient)->send(new \App\Mail\ContactFormSubmitted($contactMessage));
-        } catch (\Throwable $e) {
-            // log error, but don't expose details to user
-            // logger($e->getMessage());
+        // The message is saved either way (Admin → Contact messages); email is a bonus.
+        // Failures are reported (Error log) but never shown to the visitor.
+        if ($recipient) {
+            try {
+                Mail::to($recipient)->send(new \App\Mail\ContactFormSubmitted($contactMessage));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return back()->with('success', 'Thank you for contacting us. We will get back to you soon.');
