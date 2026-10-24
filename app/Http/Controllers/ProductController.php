@@ -14,10 +14,10 @@ class ProductController extends Controller
     {
         // ---- Global price range (for slider/inputs) ----
         $minPriceRaw = Product::where('is_active', true)
-            ->min(DB::raw('COALESCE(sale_price, price)'));
+            ->min(DB::raw(Product::effectivePriceSql()));
 
         $maxPriceRaw = Product::where('is_active', true)
-            ->max(DB::raw('COALESCE(sale_price, price)'));
+            ->max(DB::raw(Product::effectivePriceSql()));
 
         $minPrice = (int) floor($minPriceRaw ?? 0);
         $maxPrice = (int) ceil($maxPriceRaw ?? 0);
@@ -114,8 +114,9 @@ class ProductController extends Controller
             $query->where('is_on_sale', true);
         }
 
-        $query->whereBetween(
-            DB::raw('COALESCE(sale_price, price)'),
+        // CAST the bounds: SQLite binds PHP floats as text, which never compares equal/between numbers
+        $query->whereRaw(
+            '(' . Product::effectivePriceSql() . ') BETWEEN CAST(? AS DECIMAL(10,2)) AND CAST(? AS DECIMAL(10,2))',
             [$currentMin, $currentMax]
         );
 
@@ -126,11 +127,11 @@ class ProductController extends Controller
                 break;
 
             case 'price_low_high':
-                $query->orderByRaw('COALESCE(sale_price, price) asc');
+                $query->orderByRaw(Product::effectivePriceSql() . ' asc');
                 break;
 
             case 'price_high_low':
-                $query->orderByRaw('COALESCE(sale_price, price) desc');
+                $query->orderByRaw(Product::effectivePriceSql() . ' desc');
                 break;
 
             default:

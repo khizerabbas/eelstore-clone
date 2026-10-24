@@ -36,11 +36,18 @@ class Product extends Model
         return $this->belongsTo(Company::class);
     }
 
-    // helper for display
+    // Single price rule: sale price only counts when the product is flagged on sale.
+    // Keep effectivePriceSql() in sync with this for DB filtering/sorting.
     public function getDisplayPrice(): float
     {
         return $this->is_on_sale && $this->sale_price
             ? (float) $this->sale_price
             : (float) $this->price;
+    }
+
+    // SQL version of getDisplayPrice() for whereBetween / orderBy / min / max
+    public static function effectivePriceSql(): string
+    {
+        return 'CASE WHEN is_on_sale = 1 AND sale_price > 0 THEN sale_price ELSE price END';
     }
 }

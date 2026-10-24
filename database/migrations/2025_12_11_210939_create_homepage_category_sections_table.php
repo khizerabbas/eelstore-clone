@@ -3,8 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-use App\Models\Category;
 
 return new class extends Migration {
     public function up(): void
@@ -20,19 +18,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // Seed initial 3 sections using the first 3 categories (for now)
-        $categories = Category::orderBy('id')->take(3)->get();
-        $position = 1;
-
-        foreach ($categories as $category) {
-            DB::table('homepage_category_sections')->insert([
-                'category_id' => $category->id,
-                'position'    => $position++,
-                'is_active'   => true,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ]);
-        }
+        // Initial rows are created by HomepageCategorySectionSeeder (categories don't exist yet at migrate time)
     }
 
     public function down(): void

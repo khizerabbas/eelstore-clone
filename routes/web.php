@@ -16,13 +16,6 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::get('/category/{slug}', [CategoryController::class, 'show'])
-    ->name('category.show');
-
-Route::get('/product/{slug}', [ProductController::class, 'show'])
-    ->name('product.show');
-
-Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('category.show');
 
 Route::get('/product/{slug}', [ProductController::class, 'show'])->name('product.show');
