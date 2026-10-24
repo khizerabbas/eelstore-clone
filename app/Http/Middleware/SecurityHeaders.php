@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ContentSecurityPolicy;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,12 @@ class SecurityHeaders
         // Tell browsers to always use HTTPS (only once the live site is on HTTPS)
         if ($request->isSecure() && app()->isProduction()) {
             $headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+        }
+
+        // Content-Security-Policy on HTML pages (downloads/JSON keep whatever they set themselves)
+        $contentType = (string) $response->headers->get('Content-Type', 'text/html');
+        if (config('security.csp_enabled') && str_contains($contentType, 'text/html')) {
+            $headers[ContentSecurityPolicy::headerName()] = ContentSecurityPolicy::header();
         }
 
         foreach ($headers as $name => $value) {

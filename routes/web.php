@@ -10,6 +10,7 @@ use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CspReportController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
@@ -61,6 +62,11 @@ Route::get('/bulk-quote/thank-you', [QuoteController::class, 'thanks'])->name('q
 Route::post('/client-errors', [ClientErrorController::class, 'store'])
     ->middleware('throttle:' . config('errorlog.browser_reports_per_minute', 20) . ',1')
     ->name('client-errors.store');
+
+// Content-Security-Policy violation reports from browsers (CSRF-exempt)
+Route::post('/csp-report', [CspReportController::class, 'store'])
+    ->middleware('throttle:30,1')
+    ->name('csp-report');
 
 // CMS pages managed in the admin (Website → Content pages)
 Route::get('/pages/{slug}', [PageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');

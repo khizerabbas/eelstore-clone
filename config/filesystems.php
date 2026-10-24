@@ -38,6 +38,15 @@ return [
             'report' => false,
         ],
 
+        // Backup zips (spatie/laravel-backup) – private, downloadable by the Owner in Admin → Settings → Backups
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

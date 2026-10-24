@@ -16,6 +16,11 @@ if (config('orders.queue_worker_via_scheduler')) {
         ->withoutOverlapping(5);
 }
 
+// Nightly backup (database + uploads) to storage/app/backups, old backups cleaned, health checked
+Schedule::command('backup:clean')->dailyAt('01:00');
+Schedule::command('backup:run')->dailyAt('01:30');
+Schedule::command('backup:monitor')->dailyAt('03:00');
+
 // Housekeeping: failed jobs older than 30 days, activity log entries older than a year,
 // error log entries not seen for ERROR_LOG_RETENTION_DAYS (default 30)
 Schedule::command('queue:prune-failed --hours=720')->daily();

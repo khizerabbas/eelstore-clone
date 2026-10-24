@@ -21,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
 
         // Browser error reports must arrive even when the page's CSRF token has expired
-        $middleware->validateCsrfTokens(except: ['client-errors']);
+        $middleware->validateCsrfTokens(except: ['client-errors', 'csp-report']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Save crashes to the database for the admin (Settings → Error log). laravel.log keeps them too.
@@ -34,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $status = $response->getStatusCode();
 
             // (the error-report endpoint itself is skipped so a flood of reports can't flood the log)
-            if (in_array($status, config('errorlog.http_statuses', []), true) && ! $request->is('client-errors')) {
+            if (in_array($status, config('errorlog.http_statuses', []), true) && ! $request->is('client-errors', 'csp-report')) {
                 ErrorRecorder::http($status, match ($status) {
                     419     => 'Page expired: the form was open too long or the session ended (visitor saw "Page Expired")',
                     429     => 'Too many requests: a visitor hit a rate limit',

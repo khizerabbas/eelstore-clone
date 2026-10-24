@@ -61,6 +61,8 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            // Folder containing mysqldump for backups, e.g. D:/xampp/mysql/bin (empty = found on PATH)
+            'dump' => ['dump_binary_path' => env('DB_DUMP_BINARY_PATH', '')],
         ],
 
         'mariadb' => [
