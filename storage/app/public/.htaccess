@@ -1,0 +1,17 @@
+# Uploaded files are data, never code: block script execution and only serve normal media/doc types.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+<FilesMatch "\.(php[0-9]?|phtml|phar|pl|py|cgi|sh|asp|aspx|jsp|htm|html|svg|js)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes -ExecCGI
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

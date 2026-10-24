@@ -145,8 +145,10 @@ Cart → /checkout (name*, phone*, email, address, comment)
 > share image, Google verification). Content lives in `site_contents` with defaults in `config/site_content.php`
 > (`content('key')` helper, cached). Theme colours are CSS variables used by Tailwind (`brand`, `accent`, `on-accent`,
 > `accent-ink`, `page`). Product images + gallery now show on cards, product page and cart.
-> **Still to do:** resized/WebP copies of uploaded images (10 MB originals are served as-is for now), proper indexable
-> category pages, brand pages, deals/new-arrivals blocks, wire length estimator, bulk quote form.
+> **Also done:** WebP copies of every upload (thumb 480 px / large 1280 px, `app:optimize-images` to backfill; replaced
+> or deleted images are cleaned up), "No preview available" placeholder for missing/broken images (custom one uploadable),
+> real indexable category pages (`/category/{slug}`, includes sub-categories).
+> **Still to do:** brand pages, deals/new-arrivals/featured blocks, wire length estimator, bulk quote form.
 
 - Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
 - Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.
@@ -154,13 +156,22 @@ Cart → /checkout (name*, phone*, email, address, comment)
 - Brand pages, plus "Today's deals", "New arrivals" and "Featured" blocks on the home page.
 - Wire/cable length estimator and a "Bulk quote" form for electricians (both lead into the same order-request flow).
 
-### Step 4 – SEO 🟠
+### Step 4 – SEO 🟡 (mostly done 2026-10-24)
+> **Done:** titles/descriptions/canonical/Open Graph on every page, editable SEO settings, JSON-LD (Store, Product + PKR
+> Offer, BreadcrumbList), dynamic `sitemap.xml` + `robots.txt` (blocks everything outside production), `noindex` on cart,
+> checkout, orders, wishlist, search and filter/sort variations. **Left:** connect Google Search Console + Business Profile
+> after launch, measure Core Web Vitals on the live server.
 - Unique `<title>` and meta description per page, canonical URLs, Open Graph and Twitter cards.
 - JSON-LD: `LocalBusiness`/`ElectronicsStore` (Lahore address, hours, phone), `Product` + `Offer` (PKR, availability), `BreadcrumbList`.
 - An automatically built `sitemap.xml` and a correct `robots.txt`. `noindex` on cart, checkout, orders, search and filter combinations.
 - Performance and Core Web Vitals: cached menus and settings, eager loading, optimised images. Link the Google Business Profile.
 
-### Step 5 – Security hardening & launch 🟢
+### Step 5 – Security hardening & launch 🟡 (hardening done 2026-10-24, launch pending)
+> **Done:** security headers on storefront + admin (nosniff, SAMEORIGIN, Referrer-Policy, Permissions-Policy, COOP, HSTS on
+> HTTPS in production, no X-Powered-By), rate limits on every POST route, uploads folder can't run scripts
+> (`storage/app/public/.htaccess`), JPG/PNG/WebP-only uploads, policies on every admin resource, 2FA, clean composer/npm audits,
+> Breeze leftovers removed. **Left for launch:** a Content-Security-Policy (needs testing against Alpine/Livewire),
+> backups, error monitoring, HTTPS + `.env` production values, queue worker/cron.
 - `APP_DEBUG=false`, HTTPS with HSTS, secure session cookies, and security headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy).
 - Rate limits on every POST route. Strict upload validation (re-encode images, block SVG/PHP). Policies on every admin resource.
 - `composer audit` / `npm audit`, DB backups (`spatie/laravel-backup`), error monitoring, and a queue worker plus scheduler (cron on shared hosting).

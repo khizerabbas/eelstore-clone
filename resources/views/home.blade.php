@@ -4,6 +4,10 @@
 
 @section('title', Content::text('seo.home_title'))
 
+@push('meta')
+    {!! \App\Support\StructuredData::script(\App\Support\StructuredData::store()) !!}
+@endpush
+
 @section('content')
     @php
         $buttons = collect([

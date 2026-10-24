@@ -2,13 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasImageVariants;
+use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, HasImageVariants;
+
+    protected function imageAttributes(): array
+    {
+        return ['image', 'gallery'];
+    }
 
     protected $fillable = [
         'category_id',
@@ -59,20 +65,20 @@ class Product extends Model
             : (float) $this->price;
     }
 
-    // Uploaded main image (public disk) or null
-    public function imageUrl(): ?string
+    // Main image (WebP copy of the requested size when available) or null
+    public function imageUrl(string $size = 'thumb'): ?string
     {
-        return $this->image ? Storage::disk('public')->url($this->image) : null;
+        return ImageVariants::url($this->image, $size);
     }
 
     // Main image followed by gallery images
-    public function imageUrls(): array
+    public function imageUrls(string $size = 'large'): array
     {
         return collect([$this->image])
             ->merge($this->gallery ?? [])
             ->filter()
             ->unique()
-            ->map(fn (string $path) => Storage::disk('public')->url($path))
+            ->map(fn (string $path) => ImageVariants::url($path, $size))
             ->values()
             ->all();
     }

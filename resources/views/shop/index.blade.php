@@ -1,16 +1,55 @@
 @extends('layouts.frontend')
 
-@section('title', \App\Support\Content::text('pages.shop_title') . \App\Support\Content::text('seo.title_suffix'))
+@php
+    use App\Support\Content;
+
+    $currentCategory ??= null;
+    $filterAction = $currentCategory ? route('category.show', $currentCategory->slug) : route('shop.index');
+@endphp
+
+@if($currentCategory)
+    @section('title', ($currentCategory->meta_title ?: $currentCategory->name) . Content::text('seo.title_suffix'))
+    @section('meta_description', $currentCategory->meta_description ?: \Illuminate\Support\Str::limit((string) $currentCategory->description, 155))
+@else
+    @section('title', Content::text('pages.shop_title') . Content::text('seo.title_suffix'))
+@endif
+
+@if($currentCategory)
+    @push('meta')
+        {!! \App\Support\StructuredData::script(\App\Support\StructuredData::breadcrumbs(\App\Support\StructuredData::categoryCrumbs($currentCategory))) !!}
+    @endpush
+@endif
+
+{{-- Filter/sort combinations are not separate pages for Google --}}
+@if(request()->hasAny(['companies', 'on_sale', 'min_price', 'max_price', 'sort', 'per_page', 'page']) || (! $currentCategory && request()->has('categories')))
+    @push('meta')
+        <meta name="robots" content="noindex, follow">
+    @endpush
+@endif
 
 @section('content')
     {{-- Header --}}
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold">{{ \App\Support\Content::text('pages.shop_title') }}</h1>
-                <p class="text-sm text-gray-300 mt-1">
-                    {{ \App\Support\Content::text('pages.shop_intro') }}
-                </p>
+                @if($currentCategory)
+                    <nav class="text-xs text-gray-400 mb-1" aria-label="Breadcrumb">
+                        <a href="{{ route('home') }}" class="hover:text-accent">{{ content('header.nav_home') }}</a> /
+                        <a href="{{ route('shop.index') }}" class="hover:text-accent">{{ Content::text('pages.shop_title') }}</a>
+                        @if($currentCategory->parent)
+                            / <a href="{{ route('category.show', $currentCategory->parent->slug) }}" class="hover:text-accent">{{ $currentCategory->parent->name }}</a>
+                        @endif
+                    </nav>
+                    <h1 class="text-2xl font-bold">{{ $currentCategory->name }}</h1>
+                    @if($currentCategory->description)
+                        <p class="text-sm text-gray-300 mt-1 max-w-3xl">{{ $currentCategory->description }}</p>
+                    @endif
+                @else
+                    <h1 class="text-2xl font-bold">{{ Content::text('pages.shop_title') }}</h1>
+                    <p class="text-sm text-gray-300 mt-1">
+                        {{ Content::text('pages.shop_intro') }}
+                    </p>
+                @endif
             </div>
         </div>
     </section>
@@ -23,7 +62,7 @@
                 <form
                     id="shop-filters-form"
                     method="GET"
-                    action="{{ route('shop.index') }}"
+                    action="{{ $filterAction }}"
                     class="bg-white border border-gray-200 rounded-xl px-4 py-5 space-y-6 shadow-sm"
                 >
                     {{-- SHOP BY CATEGORIES + nested companies --}}

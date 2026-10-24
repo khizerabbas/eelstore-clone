@@ -2,6 +2,10 @@
 
 @section('title', 'Search' . \App\Support\Content::text('seo.title_suffix'))
 
+@push('meta')
+    <meta name="robots" content="noindex, follow">
+@endpush
+
 @section('content')
     <section class="bg-brand text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

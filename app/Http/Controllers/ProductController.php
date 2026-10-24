@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, ?Category $currentCategory = null)
     {
         // ---- Global price range (for slider/inputs) ----
         $minPriceRaw = Product::where('is_active', true)
@@ -183,6 +183,7 @@ class ProductController extends Controller
         }
 
         return view('shop.index', [
+            'currentCategory'    => $currentCategory,
             'products'           => $products,
             'categories'         => $categories,
             'categoryCompanies'  => $categoryCompanies,

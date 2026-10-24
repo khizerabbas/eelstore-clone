@@ -5,29 +5,25 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use Illuminate\Http\Request;
 
+// Indexable category pages (/category/{slug}): the shop listing pre-filtered to this category and its sub-categories
 class CategoryController extends Controller
 {
     public function show(Request $request, string $slug)
     {
-        // Find the category by slug
         $category = Category::where('slug', $slug)
             ->where('is_active', true)
             ->firstOrFail();
 
-        // Carry over existing query params (?sort=..., ?per_page=..., etc.)
-        $query = $request->query();
+        if (! $request->has('categories')) {
+            $ids = Category::where('parent_id', $category->id)
+                ->where('is_active', true)
+                ->pluck('id')
+                ->prepend($category->id)
+                ->all();
 
-        // Ensure categories[] is an array
-        $selected = (array) ($query['categories'] ?? []);
-
-        // Add this category ID if not already in the list
-        if (! in_array($category->id, $selected)) {
-            $selected[] = $category->id;
+            $request->merge(['categories' => $ids]);
         }
 
-        $query['categories'] = $selected;
-
-        // Redirect to the shop page with this category pre-selected
-        return redirect()->route('shop.index', $query);
+        return app(ProductController::class)->index($request, $category);
     }
 }

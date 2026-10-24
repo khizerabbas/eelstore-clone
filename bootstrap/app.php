@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Only admins have accounts, so guests hitting an auth-protected route go to the admin login
         $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+
+        // Browser security headers on every page (storefront and admin)
+        $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasImageVariants;
+use App\Support\ImageVariants;
 use Illuminate\Database\Eloquent\Model;
 
 class HomepageSlider extends Model
 {
+    use HasImageVariants;
+
+    protected function imageAttributes(): array
+    {
+        return ['image_path'];
+    }
+
     protected $fillable = [
         'title',
         'image_path',
@@ -29,6 +38,6 @@ class HomepageSlider extends Model
             return asset($this->image_path);
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->image_path);
+        return ImageVariants::url($this->image_path, 'large');
     }
 }

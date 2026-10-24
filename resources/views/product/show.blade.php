@@ -3,6 +3,14 @@
 @section('title', ($product->meta_title ?: $product->name) . \App\Support\Content::text('seo.title_suffix'))
 @section('meta_description', $product->meta_description ?: \Illuminate\Support\Str::limit(strip_tags((string) ($product->short_description ?: $product->description)), 155))
 
+@push('meta')
+    {!! \App\Support\StructuredData::script(\App\Support\StructuredData::product($product)) !!}
+    {!! \App\Support\StructuredData::script(\App\Support\StructuredData::breadcrumbs(array_merge(
+        $product->category ? \App\Support\StructuredData::categoryCrumbs($product->category) : [],
+        [[$product->name, route('product.show', $product->slug)]]
+    ))) !!}
+@endpush
+
 @section('content')
     {{-- Breadcrumb + title --}}
     <section class="bg-brand text-white">
@@ -25,7 +33,10 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {{-- Left: image(s) --}}
             <div>
-                @php $images = $product->imageUrls(); @endphp
+                @php
+                    $images = $product->imageUrls('large');
+                    $thumbs = $product->imageUrls('thumb');
+                @endphp
                 @if(count($images))
                     <div x-data="{ active: @js($images[0]) }">
                         <div class="bg-white border border-gray-200 rounded-lg h-72 sm:h-96 flex items-center justify-center mb-3 overflow-hidden">
@@ -33,11 +44,11 @@
                         </div>
                         @if(count($images) > 1)
                             <div class="flex flex-wrap gap-2">
-                                @foreach($images as $image)
+                                @foreach($images as $i => $image)
                                     <button type="button" x-on:click="active = @js($image)"
                                             class="w-16 h-16 rounded-md border overflow-hidden bg-white"
                                             :class="active === @js($image) ? 'border-accent ring-2 ring-accent' : 'border-gray-200'">
-                                        <x-store-image :src="$image" :alt="$product->name" class="w-full h-full object-contain"/>
+                                        <x-store-image :src="$thumbs[$i] ?? $image" :alt="$product->name" class="w-full h-full object-contain"/>
                                     </button>
                                 @endforeach
                             </div>
