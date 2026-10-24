@@ -80,7 +80,7 @@
                     </p>
                     @if($product->description)
                         <div class="prose prose-sm max-w-none text-gray-700">
-                            {!! nl2br(e($product->description)) !!}
+                            {!! \App\Support\RichText::render($product->description) !!}
                         </div>
                     @endif
                 </div>

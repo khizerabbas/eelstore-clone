@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\OrderPrintController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
@@ -7,16 +8,11 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
-
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::get('/category/{slug}', [CategoryController::class, 'show'])->name('category.show');
 
@@ -37,8 +33,14 @@ Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.sho
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:20,1')->name('checkout.store');
 
 Route::get('/my-orders', [OrderController::class, 'index'])->name('orders.index');
-Route::get('/orders/{order}', [OrderController::class, 'show'])->where('order', '[A-Za-z0-9]{48}')->name('orders.show');
-Route::post('/orders/{order}/reorder', [OrderController::class, 'reorder'])->where('order', '[A-Za-z0-9]{48}')->name('orders.reorder');
+Route::get('/orders/{order:public_token}', [OrderController::class, 'show'])->where('order', '[A-Za-z0-9]{48}')->name('orders.show');
+Route::post('/orders/{order:public_token}/reorder', [OrderController::class, 'reorder'])->where('order', '[A-Za-z0-9]{48}')->name('orders.reorder');
+
+// Admin-only extras outside the Filament panel
+Route::get('/admin/orders/{order:id}/print', OrderPrintController::class)
+    ->middleware('auth')
+    ->whereNumber('order')
+    ->name('admin.orders.print');
 
 Route::get('/contact-us',[ContactController::class, 'index'])->name('contact.show');
 Route::post('/contact-us', [ContactController::class, 'submit'])->name('contact.submit');
@@ -47,11 +49,3 @@ Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.in
 Route::post('/wishlist/add/{product}', [WishlistController::class, 'add'])->name('wishlist.add');
 Route::post('/wishlist/remove/{product}', [WishlistController::class, 'remove'])->name('wishlist.remove');
 Route::post('/wishlist/clear', [WishlistController::class, 'clear'])->name('wishlist.clear');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-require __DIR__.'/auth.php';

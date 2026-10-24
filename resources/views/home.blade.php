@@ -42,7 +42,7 @@
                                     data-hero-slide
                                 >
                                     <img
-                                        src="{{ asset($slide->image_path) }}"
+                                        src="{{ $slide->imageUrl() }}"
                                         alt="{{ $slide->title ?? 'Homepage slide '.($index + 1) }}"
                                         class="w-full h-full object-cover"
                                     >

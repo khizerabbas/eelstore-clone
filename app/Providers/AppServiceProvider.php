@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Models\SiteSetting;
+use App\Models\User;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use App\Services\WhatsApp\CallMeBotWhatsAppNotifier;
 use App\Services\WhatsApp\CloudApiWhatsAppNotifier;
 use App\Services\WhatsApp\LogWhatsAppNotifier;
@@ -37,6 +40,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Record admin logins (shown in the admin users list)
+        Event::listen(Login::class, function (Login $event) {
+            if ($event->user instanceof User) {
+                $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            }
+        });
+
         View::composer('layouts.frontend', function ($view) {
             // site settings (phone, email, socials, map etc.)
             $settings = SiteSetting::current();

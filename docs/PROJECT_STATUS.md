@@ -115,7 +115,18 @@ Cart → /checkout (name*, phone*, email, address, comment)
   Both pages are `noindex`. A **Re-order** button puts the same items back in the cart.
 - Feature tests covering validation, pricing, the notifications sent, the cookie, and the status page.
 
-### Step 2 – Admin panel (Filament v4) 🔴
+### Step 2 – Admin panel (Filament 5) ✅ (done 2026-10-24)
+> Built at `/admin`: dashboard (stats + latest requests); order requests (status tabs, WhatsApp/Call, Mark contacted,
+> Change status with notes, edit, packing slip); products (main image + gallery, sale price, stock, SEO); categories
+> (nesting, image, SEO; non-empty categories can't be deleted); brands; home slider; home sections; content pages;
+> contact inbox; admin users (Owner only); store settings (Owner only). Breeze customer auth removed – only admins log in.
+> Roles: Owner / Staff (`App\Policies\*`). 2FA via authenticator app (required in production, `ADMIN_REQUIRE_2FA`).
+> Create admins with `php artisan app:create-admin`. Rich text is rendered through `App\Support\RichText` (sanitised).
+> Not done yet (later): activity log of who changed what; storefront pages/footer that show the CMS pages (Step 3).
+>
+> **Server requirements found during this step:** PHP extensions `intl` and `gd`; after deploy run
+> `php artisan storage:link` and `php artisan filament:assets` (published assets are gitignored).
+
 - **Lock down authentication first.** Remove Breeze's public register, profile and customer login. Only admins log in, at `/admin`,
   with login throttling and Filament's built-in **2FA**. Roles: Owner and Staff.
 - **Dashboard**: new requests, requests waiting for contact, today/this week, top products, low stock.

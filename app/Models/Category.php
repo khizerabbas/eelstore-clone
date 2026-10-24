@@ -14,9 +14,17 @@ class Category extends Model
         'slug',
         'parent_id',
         'description',
+        'image',
         'is_active',
         'sort_order',
+        'meta_title',
+        'meta_description',
     ];
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
+    }
 
     // products in this category
     public function products()

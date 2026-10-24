@@ -15,8 +15,14 @@ class SiteSetting extends Model
         'facebook_url',
         'instagram_url',
         'whatsapp_url',
+        'youtube_url',
+        'x_url',
         'map_embed_url',
         'contact_recipient_email',
+        'home_hero_title',
+        'home_hero_subtitle',
+        'footer_about',
+        'opening_hours',
     ];
 
     // wa.me link to the store: uses whatsapp_url if set, otherwise the contact phone
@@ -34,6 +40,22 @@ class SiteSetting extends Model
         }
 
         return $url . (str_contains($url, '?') ? '&' : '?') . 'text=' . rawurlencode($text);
+    }
+
+    // Only Google Maps "embed" URLs can be shown in an iframe. Accepts the full <iframe …> snippet or just the src.
+    public static function extractMapSrc(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (preg_match('/src=["\']([^"\']+)["\']/i', $value, $m)) {
+            $value = html_entity_decode($m[1]);
+        }
+
+        $value = trim($value);
+
+        return str_starts_with($value, 'https://www.google.com/maps/embed') ? $value : null;
     }
 
     public static function current(): self

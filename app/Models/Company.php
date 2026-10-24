@@ -13,8 +13,14 @@ class Company extends Model
         'name',
         'slug',
         'description',
+        'logo',
         'is_active',
     ];
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
+    }
 
     public function products()
     {

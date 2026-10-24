@@ -207,17 +207,26 @@
     {{-- Map + social icons --}}
     <section class="bg-white border-t border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            <div class="w-full h-64 md:h-80 rounded-lg overflow-hidden border border-gray-200">
-                <iframe
-                    src="{{ $settings->map_embed_url ?? 'https://maps.app.goo.gl/HW8Fk18AqHee17ht8' }}"
-                    width="100%"
-                    height="100%"
-                    style="border:0;"
-                    allowfullscreen=""
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                ></iframe>
-            </div>
+            @php $mapSrc = \App\Models\SiteSetting::extractMapSrc($settings->map_embed_url); @endphp
+            @if($mapSrc)
+                <div class="w-full h-64 md:h-80 rounded-lg overflow-hidden border border-gray-200">
+                    <iframe
+                        src="{{ $mapSrc }}"
+                        title="Store location map"
+                        width="100%"
+                        height="100%"
+                        style="border:0;"
+                        allowfullscreen=""
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                    ></iframe>
+                </div>
+            @elseif($settings->map_embed_url && str_starts_with($settings->map_embed_url, 'https://'))
+                <a href="{{ $settings->map_embed_url }}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+                    📍 Open our location in Google Maps
+                </a>
+            @endif
 
             <div class="flex flex-wrap items-center gap-4">
                 <span class="text-sm font-semibold text-gray-700">Follow Us:</span>

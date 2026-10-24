@@ -24,7 +24,20 @@ class Product extends Model
         'short_description',
         'description',
         'image',
+        'gallery',
+        'meta_title',
+        'meta_description',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'gallery'     => 'array',
+            'is_on_sale'  => 'boolean',
+            'is_active'   => 'boolean',
+            'is_featured' => 'boolean',
+        ];
+    }
 
     public function category()
     {

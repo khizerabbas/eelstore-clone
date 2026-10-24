@@ -2,7 +2,10 @@
 
 namespace App\Enums;
 
-enum OrderStatus: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum OrderStatus: string implements HasColor, HasLabel
 {
     case New            = 'new';
     case Contacted      = 'contacted';
@@ -20,6 +23,31 @@ enum OrderStatus: string
             self::OutForDelivery => 'Out for delivery',
             self::Delivered      => 'Delivered',
             self::Cancelled      => 'Cancelled',
+        };
+    }
+
+    // Admin panel label (label() above is the customer-facing wording)
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::New            => 'New',
+            self::Contacted      => 'Contacted',
+            self::Confirmed      => 'Confirmed',
+            self::OutForDelivery => 'Out for delivery',
+            self::Delivered      => 'Delivered',
+            self::Cancelled      => 'Cancelled',
+        };
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::New            => 'warning',
+            self::Contacted      => 'info',
+            self::Confirmed      => 'primary',
+            self::OutForDelivery => 'gray',
+            self::Delivered      => 'success',
+            self::Cancelled      => 'danger',
         };
     }
 

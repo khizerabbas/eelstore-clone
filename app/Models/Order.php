@@ -60,14 +60,13 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function getRouteKeyName(): string
-    {
-        return 'public_token';
-    }
-
-    public function markStatus(OrderStatus $status): void
+    public function markStatus(OrderStatus $status, ?string $note = null, ?string $by = null): void
     {
         $this->status = $status;
+
+        // Keep a simple running log in the admin note
+        $line = now()->format('d M Y H:i') . ' – ' . $status->getLabel() . ($by ? " by {$by}" : '') . ($note ? ": {$note}" : '');
+        $this->admin_note = trim(($this->admin_note ? $this->admin_note . "\n" : '') . $line);
 
         if ($column = $status->timestampColumn()) {
             $this->{$column} ??= now();
