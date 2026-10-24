@@ -4,6 +4,7 @@ namespace App\Filament\Resources\QuoteRequests\Tables;
 
 use App\Enums\QuoteStatus;
 use App\Filament\Resources\QuoteRequests\QuoteRequestResource;
+use App\Filament\Support\Fields;
 use App\Models\QuoteRequest;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -28,19 +29,22 @@ class QuoteRequestsTable
                     ->label('Received')
                     ->dateTime('d M Y, h:i A')
                     ->description(fn (QuoteRequest $record) => $record->created_at->diffForHumans())
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
                 TextColumn::make('name')
                     ->label('Customer')
                     ->searchable()
-                    ->description(fn (QuoteRequest $record) => $record->business_name),
+                    ->description(fn (QuoteRequest $record) => $record->business_name !== $record->name ? $record->business_name : null),
                 TextColumn::make('phone')
                     ->label('Mobile')
                     ->formatStateUsing(fn (QuoteRequest $record) => $record->displayPhone())
-                    ->searchable(),
+                    ->visibleFrom('lg')
+                    ->searchable(query: Fields::phoneSearch('phone')),
                 TextColumn::make('items')
                     ->label('Request')
                     ->formatStateUsing(fn (?string $state) => Str::limit(preg_replace('/\s+/', ' ', (string) $state), 60))
                     ->placeholder('(attached list)')
+                    ->visibleFrom('lg')
                     ->wrap(),
                 IconColumn::make('attachment_path')
                     ->label('File')

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\OrderActions;
+use App\Filament\Support\Fields;
 use App\Models\Order;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -16,6 +17,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class OrdersTable
 {
@@ -31,32 +33,30 @@ class OrdersTable
                     ->label('Requested')
                     ->dateTime('d M Y, h:i A')
                     ->description(fn (Order $record) => $record->created_at->diffForHumans())
-                    ->sortable(),
+                    ->sortable()
+                    // Phones: keep customer, total and status in view (row click still opens the order)
+                    ->visibleFrom('md'),
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->searchable(),
                 TextColumn::make('customer_phone')
                     ->label('Mobile')
+                    ->visibleFrom('lg')
                     ->formatStateUsing(fn (Order $record) => $record->displayPhone())
                     ->copyable()
                     ->copyableState(fn (Order $record) => $record->displayPhone())
-                    ->searchable(query: function (Builder $query, string $search) {
-                        // Let staff search "0300 1234567", "3001234567", "+92…"
-                        $digits = preg_replace('/\D/', '', $search);
-                        $digits = preg_replace('/^(0092|92|0)/', '', $digits);
-
-                        return $digits !== '' ? $query->where('customer_phone', 'like', "%{$digits}%") : $query;
-                    }),
+                    ->searchable(query: Fields::phoneSearch('customer_phone')),
+                TextColumn::make('status')
+                    ->badge(),
                 TextColumn::make('items_count')
                     ->label('Items')
+                    ->visibleFrom('lg')
                     ->numeric()
                     ->alignCenter(),
                 TextColumn::make('subtotal')
                     ->label('Total')
                     ->formatStateUsing(fn ($state) => 'Rs ' . number_format((float) $state))
                     ->sortable(),
-                TextColumn::make('status')
-                    ->badge(),
                 TextColumn::make('customer_email')
                     ->label('Email')
                     ->searchable()
@@ -67,18 +67,24 @@ class OrdersTable
                     ->options(OrderStatus::class)
                     ->multiple(),
                 Filter::make('created_at')
+                    ->label('Requested between')
                     ->schema([
-                        DatePicker::make('from'),
-                        DatePicker::make('until'),
+                        DatePicker::make('from')->label('Requested from')->native(false)->maxDate(now()),
+                        DatePicker::make('until')->label('Requested until')->native(false)->maxDate(now()),
                     ])
                     ->query(fn (Builder $query, array $data) => $query
                         ->when($data['from'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
-                        ->when($data['until'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))),
+                        ->when($data['until'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date)))
+                    // Show the chosen dates above the table, with an ✕ to clear them
+                    ->indicateUsing(fn (array $data): array => array_filter([
+                        'from'  => ($data['from'] ?? null) ? 'From ' . Carbon::parse($data['from'])->format('d M Y') : null,
+                        'until' => ($data['until'] ?? null) ? 'Until ' . Carbon::parse($data['until'])->format('d M Y') : null,
+                    ])),
             ])
             ->recordActions([
                 OrderActions::whatsapp()->iconButton(),
                 OrderActions::call()->iconButton(),
-                ViewAction::make(),
+                ViewAction::make()->iconButton()->tooltip('View'),
                 ActionGroup::make([
                     OrderActions::markContacted(),
                     OrderActions::changeStatus(),

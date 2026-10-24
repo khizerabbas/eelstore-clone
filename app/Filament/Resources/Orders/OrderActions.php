@@ -62,7 +62,8 @@ class OrderActions
                 Select::make('status')
                     ->options(OrderStatus::class)
                     ->required()
-                    ->native(false),
+                    ->native(false)
+                    ->selectablePlaceholder(false),
                 Textarea::make('note')
                     ->label('Note (optional, internal)')
                     ->rows(2)

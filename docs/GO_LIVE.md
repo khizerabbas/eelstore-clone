@@ -310,3 +310,4 @@ php artisan up
 | 2026-10-24 | Nightly backups (spatie/laravel-backup 9) + Admin → Settings → Backups | `mysqldump`; `BACKUP_*`, `DB_DUMP_BINARY_PATH`; cron line; `php artisan backup:run` once |
 | 2026-10-24 | Optional GA4 / Meta Pixel (Website → SEO) | Nothing on the server; add IDs in the admin when ready |
 | 2026-10-25 | Storefront UX pass: mobile header/cart/checkout, filter chips, image viewer, branded 404/419/429/500/503 pages; contact form takes phone **or** email | `migrate` (contact_messages.email nullable); `npm run build` |
+| 2026-10-25 | Admin QA pass: phone-friendly order/quote lists, unique SKUs, one level of sub-categories, Google Maps share links accepted in Store & contact | Nothing extra (no migration) |

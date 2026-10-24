@@ -50,7 +50,7 @@ class ProductsTable
                 TextColumn::make('price')
                     ->label('Price')
                     ->formatStateUsing(fn ($state) => Fields::rupees($state))
-                    ->description(fn (Product $record) => $record->is_on_sale && $record->sale_price
+                    ->description(fn (Product $record) => $record->isOnSale()
                         ? 'Sale: ' . Fields::rupees($record->sale_price) : null)
                     ->sortable(),
                 TextColumn::make('stock')
@@ -94,8 +94,9 @@ class ProductsTable
                     ->color('gray')
                     ->url(fn (Product $record) => route('product.show', $record->slug), shouldOpenInNewTab: true)
                     ->visible(fn (Product $record) => $record->is_active),
-                EditAction::make(),
-                DeleteAction::make(),
+                // Icon buttons keep the table narrow enough for a laptop screen
+                EditAction::make()->iconButton()->tooltip('Edit'),
+                DeleteAction::make()->iconButton()->tooltip('Delete'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

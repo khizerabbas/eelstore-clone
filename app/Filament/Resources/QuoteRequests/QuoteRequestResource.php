@@ -118,7 +118,7 @@ class QuoteRequestResource extends Resource
             ->color('primary')
             ->fillForm(fn (QuoteRequest $record) => ['status' => $record->status])
             ->schema([
-                Select::make('status')->options(QuoteStatus::class)->required()->native(false),
+                Select::make('status')->options(QuoteStatus::class)->required()->native(false)->selectablePlaceholder(false),
                 Textarea::make('note')->label('Note (optional, internal)')->rows(2)->maxLength(500),
             ])
             ->action(function (QuoteRequest $record, array $data) {

@@ -92,13 +92,14 @@ class SiteSettings extends Page
                             ->placeholder('https://wa.me/923001234567')
                             ->helperText('Used by "Message us on WhatsApp" buttons. Leave empty to use the phone number above.'),
                         Textarea::make('map_embed_url')
-                            ->label('Google Maps embed')
+                            ->label('Google Maps')
                             ->rows(2)
-                            ->helperText('Google Maps → Share → Embed a map → copy HTML, and paste it here (the link is extracted automatically).')
-                            ->dehydrateStateUsing(fn (?string $state) => SiteSetting::extractMapSrc($state))
+                            ->helperText('Best: Google Maps → Share → Embed a map → copy HTML and paste it here (shows a map on the contact page). '
+                                . 'A normal Google Maps share link also works (shows an "Open in Google Maps" button).')
+                            ->dehydrateStateUsing(fn (?string $state) => SiteSetting::normalizeMapSetting($state))
                             ->rule(fn () => function (string $attribute, $value, \Closure $fail) {
-                                if (filled($value) && SiteSetting::extractMapSrc($value) === null) {
-                                    $fail('Paste the "Embed a map" code from Google Maps (it starts with https://www.google.com/maps/embed).');
+                                if (filled($value) && SiteSetting::normalizeMapSetting($value) === null) {
+                                    $fail('Paste the "Embed a map" code or a Google Maps link (https://maps.app.goo.gl/… or https://www.google.com/maps/…).');
                                 }
                             })
                             ->columnSpanFull(),

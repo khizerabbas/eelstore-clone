@@ -31,7 +31,10 @@ class ProductForm
                                 Fields::slug(),
                                 TextInput::make('sku')
                                     ->label('SKU / code')
-                                    ->maxLength(100),
+                                    ->maxLength(100)
+                                    // Imports find existing products by SKU, so two products must never share one
+                                    ->unique(ignoreRecord: true)
+                                    ->validationMessages(['unique' => 'Another product already uses this SKU.']),
                                 Select::make('category_id')
                                     ->label('Category')
                                     ->relationship('category', 'name')

@@ -26,13 +26,19 @@ class CategoryForm
                         Fields::slug(),
                         Select::make('parent_id')
                             ->label('Parent category')
-                            ->helperText('Optional – makes this a sub-category.')
+                            ->helperText(fn (?Category $record) => $record?->children()->exists()
+                                ? 'This category has sub-categories, so it stays a main category.'
+                                : 'Optional – makes this a sub-category.')
                             ->relationship(
                                 'parent',
                                 'name',
-                                // A category can't be its own parent
-                                fn (Builder $query, ?Category $record) => $record ? $query->whereKeyNot($record->getKey()) : $query,
+                                // The shop supports one level of sub-categories: only main categories can be parents,
+                                // and never the category itself (prevents loops that hide both from the menus)
+                                fn (Builder $query, ?Category $record) => $query
+                                    ->whereNull('parent_id')
+                                    ->when($record, fn (Builder $q) => $q->whereKeyNot($record->getKey())),
                             )
+                            ->disabled(fn (?Category $record) => (bool) $record?->children()->exists())
                             ->searchable()
                             ->preload()
                             ->placeholder('None (top level)'),

@@ -8,6 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 // Field presets shared by the admin resources, so they all behave (and validate) the same way
@@ -74,6 +75,17 @@ class Fields
                     ->maxLength(160)
                     ->helperText('Shown under the title in Google results. Up to ~155 characters.'),
             ]);
+    }
+
+    // Table search for a phone column: finds "0300 1234567", "3001234567" and "+92 300…" alike
+    public static function phoneSearch(string $column): \Closure
+    {
+        return function (Builder $query, string $search) use ($column): Builder {
+            $digits = preg_replace('/\D/', '', $search);
+            $digits = preg_replace('/^(0092|92|0)/', '', $digits);
+
+            return $digits !== '' ? $query->where($column, 'like', "%{$digits}%") : $query;
+        };
     }
 
     public static function rupees($state): string

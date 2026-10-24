@@ -58,7 +58,7 @@ class CashCollectedChart extends ChartWidget
     {
         return RawJs::make(<<<'JS'
             {
-                scales: { y: { beginAtZero: true, ticks: { callback: (value) => 'Rs ' + Number(value).toLocaleString() } } },
+                scales: { y: { beginAtZero: true, suggestedMax: 1000, ticks: { precision: 0, callback: (value) => 'Rs ' + Number(value).toLocaleString() } } },
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (ctx) => 'Rs ' + Number(ctx.parsed.y).toLocaleString() } },
