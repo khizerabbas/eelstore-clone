@@ -72,107 +72,78 @@ Seeders fill in the categories (wires, lighting, …), two demo companies and de
 12. `welcome.blade.php` and `category/show.blade.php` are unused.
 13. Search uses `LIKE %q%` on three columns. That's fine for now, but it will slow down as the catalog grows. A MySQL FULLTEXT index or Laravel Scout would scale better.
 
-## 4. What's missing for a working end-to-end store
+## 4. Product direction (decided 2026-10-24)
 
-A complete purchase flow for a Pakistani electrical store looks like this:
+- **No online payment and no customer accounts.** Every order is **Cash on Delivery**, confirmed by phone or WhatsApp.
+- Checkout is an **order request**. The customer submits their name and phone (both required), plus email, address and a comment (all optional).
+  The owner gets the request by **email + WhatsApp**, contacts the customer, confirms the order and delivers it.
+- Customers see their past requests and status on a **browser-only "My Orders" page**, using a long-lived cookie with no login.
+  If they clear their cookies the list is gone. That's acceptable, because the owner keeps everything in the database.
+- An **admin panel** manages everything: orders, catalog, homepage, settings and content.
+- Every phase has to keep the site **SEO-friendly and secure**.
+
+The customer journey:
 
 ```
-Browse / Search → Product → Add to cart → Checkout (guest or login)
- → Address + phone → Shipping fee → Payment (COD / JazzCash / Easypaisa / card)
- → Order placed → Confirmation email/SMS/WhatsApp → Admin processes → Shipped (tracking) → Delivered
+Cart → /checkout (name*, phone*, email, address, comment)
+  → Order saved (reference UE-XXXXXX + secret tracking token, items and prices snapshotted)
+  → Queued notifications: admin email + WhatsApp to owner (+ confirmation email to the customer if they gave one)
+  → Thank-you page + "Message us on WhatsApp" button (pre-filled with the order reference)
+  → /my-orders (cookie) and /orders/{token} (bookmarkable) show status:
+      New → Contacted ("check your WhatsApp/email") → Confirmed → Out for delivery → Delivered  (or Cancelled)
+  → The owner moves the order through these statuses in the admin panel
 ```
 
-Right now the project covers only the **first three steps**. Everything below is still needed.
+## 5. Roadmap
 
-### Phase 1 – Make the core purchase work (MVP) 🔴
-1. **Fix the bugs in section 3** (cart update, pricing rule, duplicate routes, homepage seeding).
-2. **Orders schema**
-   - `orders`: order number, user_id (nullable for guests), customer name/phone/email, shipping address, city,
-     subtotal, shipping_fee, discount, total, payment_method, payment_status, order status, notes, timestamps.
-   - `order_items`: order_id, product_id, then a snapshot of name, SKU, unit price and qty, plus the line total.
-   - Status flow: `pending → confirmed → processing → shipped → delivered`, with `cancelled` and `returned` as side branches.
-3. **Checkout page** (`/checkout`)
-   - Guest checkout: name, phone (with Pakistani format validation, e.g. `03XXXXXXXXX`), email, address, city, notes.
-   - Re-check prices and stock on the server. Never trust the price stored in the session.
-   - Shipping fee from a simple rule (flat rate per city, or free above a threshold), stored in settings.
-   - **Cash on Delivery** as the first payment method. It's the most common way to pay online in Pakistan.
-   - Create the order and items in one DB transaction, decrement stock, then clear the cart.
-4. **Order confirmation page + email** (a mailable to the customer, plus a copy to the store).
-5. **Order tracking** at `/track-order`, looked up by order number + phone.
-6. **Add login/register/My Account links** to the storefront header. Add a **My Orders** page for logged-in users.
-7. **Merge the cart on login.** Optionally, persist the cart and wishlist to the DB for logged-in users.
+### Step 1 – Order request flow ✅ (done 2026-10-24)
+> Built: `CheckoutController`, `OrderController`, `App\Actions\PlaceOrderRequest`, `App\Support\{Cart, OrderHistory, PakistaniPhone}`,
+> `App\Services\WhatsApp\*` (log / callmebot / cloud_api), `config/orders.php`. Tested in `tests/Feature/CheckoutTest.php`.
+> **To go live:** set `ORDER_ADMIN_EMAIL`, real SMTP `MAIL_*`, `WHATSAPP_DRIVER=callmebot` + `CALLMEBOT_PHONE`/`CALLMEBOT_API_KEY`,
+> and keep a queue worker running (`php artisan queue:work`). Without a worker, emails and WhatsApp alerts wait in the `jobs` table.
 
-### Phase 2 – Admin panel 🔴 (the store can't run without one)
-Recommended: **Filament** (`filament/filament`). It works well with Laravel 12 and is fast to build with.
-- Products CRUD with **image upload** (`storage:link`, with multiple images in a `product_images` table), SKU, stock, sale price, active/featured flags.
-- Categories (including nesting) and companies/brands CRUD.
-- Orders: list, filter by status, view, change status, print an invoice or packing slip.
-- Homepage sliders and homepage category sections (replaces the "add in admin panel later" placeholder).
-- Site settings form: contact info, social links, shipping rules, hero text.
-- Contact messages inbox.
-- An `is_admin` flag or roles (e.g. `spatie/laravel-permission`) with a protected `/admin` route.
-- A dashboard with orders today, revenue, low-stock alerts and pending orders.
+- `orders` table: reference, public token, name, phone (stored normalised as `+92…`), email, address, comment, subtotal, item count,
+  status, status timestamps, internal admin note, IP and user agent. An `order_items` table holds a snapshot of product name, SKU, unit price, qty and line total.
+- `/checkout` page with a cart summary and the form. The server re-prices every item from the DB and rejects an empty cart, inactive products and silly quantities.
+- Pakistani phone validation and normalisation (`03XXXXXXXXX`, `3XXXXXXXXX`, `+92…`, `0092…`).
+- Anti-spam: honeypot, rate limit per IP and per phone, and Cloudflare Turnstile switched on through config.
+- Notifications are **queued** so checkout stays fast:
+  - Admin email (Markdown mailable): customer details, an items table, the total, and one-tap **Call** / **WhatsApp** links to the customer.
+  - **WhatsApp to the owner** through a swappable `WhatsAppNotifier` with `log`, `callmebot` and `cloud_api` drivers, chosen in `.env`.
+  - A confirmation email to the customer with their tracking link, sent only if they gave an email.
+- Thank-you page, `/orders/{token}` status page with a timeline, and `/my-orders` (an encrypted cookie holding up to 20 tokens, kept for 1 year).
+  Both pages are `noindex`. A **Re-order** button puts the same items back in the cart.
+- Feature tests covering validation, pricing, the notifications sent, the cookie, and the status page.
 
-### Phase 3 – Online payments & communication 🟠
-- Payment gateways common in Pakistan: **JazzCash**, **Easypaisa**, and a card aggregator (**Safepay**, **PayFast** or **XPay**).
-  Build them behind a `PaymentGateway` interface, with callback/webhook routes, signature verification, and idempotent updates to `payment_status`.
-- Bank transfer option: show the account details and let the customer upload a payment screenshot.
-- **WhatsApp**: a floating "Order on WhatsApp" button and a "Ask about this product" link on the product page (`wa.me` with a pre-filled product name).
-  Optionally, order notifications through the WhatsApp Business API.
-- SMS order confirmation (local SMS gateway).
-- Queue all emails (`QUEUE_CONNECTION=database` is already set, so run `queue:work` in production).
+### Step 2 – Admin panel (Filament v4) 🔴
+- **Lock down authentication first.** Remove Breeze's public register, profile and customer login. Only admins log in, at `/admin`,
+  with login throttling and Filament's built-in **2FA**. Roles: Owner and Staff.
+- **Dashboard**: new requests, requests waiting for contact, today/this week, top products, low stock.
+- **Orders**: list and filter by status, view items, Call/WhatsApp buttons, change status (with a timestamp), internal notes, print a packing slip.
+- **Catalog**: products (several images, stock, sale, featured, SEO title and description), categories (nested, image, SEO), brands (logo).
+- **Homepage**: sliders, category sections, featured/deals blocks.
+- **Settings**: store contact details, socials, WhatsApp number, order-notification recipients, footer, default SEO and analytics IDs.
+- **Content**: CMS pages (About, Delivery & COD, Returns, Warranty, Privacy, Terms, FAQ) and the contact messages inbox.
+- Activity log of who changed what.
 
-### Phase 4 – Catalog & UX features (matching sites like eelstore / Powerhouse Express) 🟡
-- **Product variants**: color (white/black), wattage, colour temperature (3000K/4000K/6000K), wire size (1.5mm/2.5mm/4mm) and roll length.
-  Use a `product_variants` table with its own price, stock and SKU.
-- A product **specs table** (key/value attributes), datasheet/PDF downloads, and a warranty note.
-- **Multiple images** with a gallery/zoom on the product page.
-- **Brands page** and a "Shop by brand" logo strip on the home page.
-- Homepage blocks: "Today's best deals", "New arrivals", "Featured" (the `is_featured` flag is already there), and a top promo bar.
-- A **mega menu** for nested categories (`parent_id` already exists).
-- **Bulk / trade orders**: a quote request form for electricians and contractors. This is common in this market.
-- Coupons / discount codes.
-- Reviews & ratings (only from verified buyers).
-- Recently viewed products, plus "Customers also bought".
-- Search autocomplete.
-- Stock badges (In stock / Low stock / Out of stock) and a "Notify me when back in stock" option.
-- Unit pricing where it applies (per metre or per roll for cables).
+### Step 3 – Fully dynamic storefront 🟠
+- Real product images (WebP, responsive sizes, lazy loading, alt text) and a product gallery.
+- Footer, menus, contact details and socials all read from settings and categories. Nothing is hardcoded.
+- **Proper category pages.** `/category/{slug}` should render its own indexable page with filters, not redirect to `/shop?categories[]=…`.
+- Brand pages, plus "Today's deals", "New arrivals" and "Featured" blocks on the home page.
+- Wire/cable length estimator and a "Bulk quote" form for electricians (both lead into the same order-request flow).
 
-### Phase 5 – Content, SEO & trust 🟡
-- Static pages: About Us, Shipping Policy, Return & Refund Policy, Warranty Policy, Privacy Policy, Terms, FAQ.
-  Managed through a simple `pages` table in the admin panel.
-- SEO: per-page `<title>`/meta description, Open Graph tags, canonical URLs, `sitemap.xml` (`spatie/laravel-sitemap`), Product JSON-LD schema, and clean slugs (already done).
-- Google Analytics 4 / Meta Pixel with ecommerce events (view_item, add_to_cart, begin_checkout, purchase).
-- Trust elements: COD available, delivery across Pakistan, genuine products, easy returns, plus the store's physical address and map (already in settings).
-- Newsletter signup.
+### Step 4 – SEO 🟠
+- Unique `<title>` and meta description per page, canonical URLs, Open Graph and Twitter cards.
+- JSON-LD: `LocalBusiness`/`ElectronicsStore` (Lahore address, hours, phone), `Product` + `Offer` (PKR, availability), `BreadcrumbList`.
+- An automatically built `sitemap.xml` and a correct `robots.txt`. `noindex` on cart, checkout, orders, search and filter combinations.
+- Performance and Core Web Vitals: cached menus and settings, eager loading, optimised images. Link the Google Business Profile.
 
-### Phase 6 – Quality, security & deployment 🟢
-- **Tests**: feature tests for the shop filters, cart (add/update/remove), checkout (stock and price checks), and order creation, plus payment callback tests.
-- Rate-limit the cart/wishlist/checkout POST routes and add server-side authorization to admin routes.
-- Image optimization (WebP, responsive sizes) and lazy-loading.
-- Caching: cache category/menu queries and site settings, with eager loading to avoid N+1 queries (the homepage runs one query per section).
-- Production `.env`: `APP_ENV=production`, `APP_DEBUG=false`, real SMTP, HTTPS, `php artisan optimize`, scheduler and queue worker running under Supervisor/cron.
-- Hosting: a VPS or managed Laravel host (Forge / Ploi / cPanel with SSH), MySQL backups (`spatie/laravel-backup`), and error monitoring (Sentry / Flare).
-- Replace the README with real setup instructions (see below).
-
-## 5. Suggested order of work
-
-| # | Task | Size |
-|---|---|---|
-| 1 | Fix the cart update bug, the single price rule, duplicate routes and homepage seeding | S |
-| 2 | Account links in the header, footer driven by settings | S |
-| 3 | Orders + order_items migrations/models | S |
-| 4 | Checkout page with COD, stock check, confirmation page + email | M |
-| 5 | Filament admin: products (with images), categories, brands, orders, settings, sliders | M–L |
-| 6 | Order tracking and My Orders | S |
-| 7 | Policy pages, SEO basics, WhatsApp button | S |
-| 8 | Tests for cart/checkout/orders | M |
-| 9 | Deploy to staging, then production | M |
-| 10 | JazzCash / Easypaisa / card gateway | M |
-| 11 | Variants, specs, reviews, coupons, bulk quote | L |
-
-When items 1–9 are done, a customer can find a product, order it with Cash on Delivery and get a confirmation,
-and the owner can manage products and process the order from the admin panel. That's a working store end to end.
+### Step 5 – Security hardening & launch 🟢
+- `APP_DEBUG=false`, HTTPS with HSTS, secure session cookies, and security headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy).
+- Rate limits on every POST route. Strict upload validation (re-encode images, block SVG/PHP). Policies on every admin resource.
+- `composer audit` / `npm audit`, DB backups (`spatie/laravel-backup`), error monitoring, and a queue worker plus scheduler (cron on shared hosting).
+- Cleanup: remove `welcome.blade.php` and the leftover Breeze customer views.
 
 ## 6. Local setup (current)
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PakistaniPhone;
 use Illuminate\Database\Eloquent\Model;
 
 class SiteSetting extends Model
@@ -17,6 +18,23 @@ class SiteSetting extends Model
         'map_embed_url',
         'contact_recipient_email',
     ];
+
+    // wa.me link to the store: uses whatsapp_url if set, otherwise the contact phone
+    public function whatsappLink(?string $text = null): ?string
+    {
+        $url = $this->whatsapp_url;
+
+        if (! $url) {
+            $phone = PakistaniPhone::normalize($this->contact_phone);
+            $url   = $phone ? 'https://wa.me/' . ltrim($phone, '+') : null;
+        }
+
+        if (! $url || ! $text) {
+            return $url;
+        }
+
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'text=' . rawurlencode($text);
+    }
 
     public static function current(): self
     {

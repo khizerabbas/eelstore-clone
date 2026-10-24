@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
@@ -30,7 +32,15 @@ Route::post('/cart/update/{product}', [CartController::class, 'update'])->name('
 Route::post('/cart/remove/{product}', [CartController::class, 'remove'])->name('cart.remove');
 Route::post('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
 
-Route::get('/contact-us', [ContactController::class, 'index'])->name('contact.show');
+// Order requests (Cash on Delivery, no customer accounts)
+Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:20,1')->name('checkout.store');
+
+Route::get('/my-orders', [OrderController::class, 'index'])->name('orders.index');
+Route::get('/orders/{order}', [OrderController::class, 'show'])->where('order', '[A-Za-z0-9]{48}')->name('orders.show');
+Route::post('/orders/{order}/reorder', [OrderController::class, 'reorder'])->where('order', '[A-Za-z0-9]{48}')->name('orders.reorder');
+
+Route::get('/contact-us',[ContactController::class, 'index'])->name('contact.show');
 Route::post('/contact-us', [ContactController::class, 'submit'])->name('contact.submit');
 
 Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');

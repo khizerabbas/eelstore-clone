@@ -256,6 +256,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+// Prevent double submission (e.g. checkout): disable the submit button once the form is sent
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-disable-on-submit')) {
+        return;
+    }
+
+    form.querySelectorAll('button[type="submit"]').forEach((button) => {
+        button.disabled = true;
+        button.textContent = 'Sending…';
+    });
+});
+
 window.Alpine = Alpine;
 
 Alpine.start();

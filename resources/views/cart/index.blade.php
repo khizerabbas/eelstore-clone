@@ -114,8 +114,8 @@
                         <span>Rs {{ number_format($total, 2) }}</span>
                     </div>
                     <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
-                        <span>Shipping</span>
-                        <span>Calculated at checkout</span>
+                        <span>Delivery</span>
+                        <span>Confirmed on call</span>
                     </div>
 
                     <div class="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center font-semibold text-sm">
@@ -124,12 +124,15 @@
                     </div>
 
                     <div class="mt-4 flex flex-col gap-2">
-                        <button
-                            type="button"
+                        <a
+                            href="{{ route('checkout.show') }}"
                             class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
                         >
-                            Proceed to Checkout (placeholder)
-                        </button>
+                            Proceed to Checkout
+                        </a>
+                        <p class="text-[11px] text-gray-500 text-center">
+                            No online payment – pay cash on delivery after we confirm your order.
+                        </p>
 
                         <form action="{{ route('cart.clear') }}" method="POST">
                             @csrf
