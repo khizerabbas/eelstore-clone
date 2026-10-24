@@ -161,6 +161,7 @@ composer install --no-dev --optimize-autoloader
 php artisan key:generate                 # only the very first time
 php artisan migrate --force              # creates all tables
 php artisan db:seed --force              # OPTIONAL demo catalog – skip if you'll add real products yourself
+php artisan db:seed --class=PolicyPagesSeeder --force   # Delivery & Returns, Privacy, Terms drafts (never overwrites edits)
 php artisan storage:link                 # makes uploaded images visible at /storage
 php artisan filament:assets              # admin panel CSS/JS into public/
 php artisan app:create-admin             # first Owner account (asks name, email, strong password)
@@ -311,3 +312,4 @@ php artisan up
 | 2026-10-24 | Optional GA4 / Meta Pixel (Website → SEO) | Nothing on the server; add IDs in the admin when ready |
 | 2026-10-25 | Storefront UX pass: mobile header/cart/checkout, filter chips, image viewer, branded 404/419/429/500/503 pages; contact form takes phone **or** email | `migrate` (contact_messages.email nullable); `npm run build` |
 | 2026-10-25 | Admin QA pass: phone-friendly order/quote lists, unique SKUs, one level of sub-categories, Google Maps share links accepted in Store & contact | Nothing extra (no migration) |
+| 2026-10-25 | Policy page drafts (Delivery & Returns, Privacy Policy, Terms) in Website → Content pages | `php artisan db:seed --class=PolicyPagesSeeder --force` once (§6); fill in the [To confirm] parts in the admin |
