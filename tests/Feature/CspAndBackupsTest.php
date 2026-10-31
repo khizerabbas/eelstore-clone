@@ -67,6 +67,7 @@ class CspAndBackupsTest extends TestCase
 
         $report('https://evil.example/x.js')->assertNoContent();
         $report('chrome-extension://abc/inject.js')->assertNoContent(); // extension noise ignored
+        $report('https://img1.wsimg.com/traffic-assets/js/tccl.min.js')->assertNoContent(); // GoDaddy's injected tracker ignored
 
         $log = ErrorLog::sole();
         $this->assertSame('CSP violation', $log->type);
