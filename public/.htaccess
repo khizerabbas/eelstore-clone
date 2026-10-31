@@ -24,9 +24,9 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# PHP limits on LiteSpeed hosting (GoDaddy cPanel): big product photos need memory/time to make WebP copies.
+# PHP limits on GoDaddy cPanel (Apache + LiteSpeed PHP, mod_lsapi): big product photos need memory/time to make WebP copies.
 # Ignored by other servers (XAMPP/Apache), which use php.ini instead – see docs/GO_LIVE.md §2.
-<IfModule Litespeed>
+<IfModule lsapi_module>
     php_value memory_limit 512M
     php_value max_execution_time 120
     php_value max_input_time 120
