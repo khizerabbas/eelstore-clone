@@ -22,6 +22,22 @@ Work through it top to bottom. Tick each box as you go.
 
 ---
 
+## Live server (as set up on 2026-11-01)
+
+| What | Value |
+|---|---|
+| Hosting | GoDaddy cPanel (Asia data centre), Apache + LiteSpeed PHP (`mod_lsapi`), PHP 8.3 |
+| SSH | `juxq9yqhbiw8@118.139.163.54` with key `~/.ssh/usman_godaddy` (authorised in cPanel → SSH Access) |
+| Code | `~/usman-electronics/releases/<date>-<commit>`; `current` → live version; `~/public_html` → `current/public` |
+| Settings / uploads | `~/usman-electronics/shared/.env` (chmod 600) and `shared/storage` – kept across deploys |
+| Deploy / undo | `bash deploy/deploy.sh` (builds CSS/JS locally – the server has no Node) / `bash deploy/deploy.sh rollback` |
+| Database | `usman`, user `juxq9yqhbiw8_usman` (this cPanel does **not** prefix database names) |
+| Mail | `MAIL_MAILER=sendmail` (cPanel's own mail server, no SMTP password), from `no-reply@usmanelectricstore.com` |
+| PHP limits | 512M memory / 20M uploads / 120 s, set in `public/.htaccess` inside `<IfModule lsapi_module>` |
+| Cron | `* * * * * cd ~/usman-electronics/current && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1` |
+| Backups | `shared/storage/app/backups/` (nightly 01:30 server time) |
+| GoDaddy placeholder page | moved to `~/public_html.godaddy-default` |
+
 ## 1. Server requirements
 
 - [ ] **PHP 8.2 or newer** (developed and tested on 8.2.12).
@@ -181,6 +197,8 @@ cPanel → Cron Jobs → "Once per minute":
 * * * * * cd /home/USER/usman-electronics && php artisan schedule:run >> /dev/null 2>&1
 ```
 (Use the full PHP path if needed, e.g. `/usr/local/bin/php` or `/opt/cpanel/ea-php82/root/usr/bin/php`.)
+> **Check it really runs:** on GoDaddy, plain `php` under cron is the *web* (CGI) PHP – it prints the artisan command list
+> and does nothing. Use the command-line binary (`/opt/alt/php83/usr/bin/php`, see "Live server" below).
 The scheduler:
 - starts the queue worker every minute (order/quote emails, WhatsApp alerts, error alert emails, **product imports/exports**),
 - makes a **backup** every night at 01:30 (cleanup at 01:00, health check at 03:00),
@@ -313,3 +331,4 @@ php artisan up
 | 2026-10-25 | Storefront UX pass: mobile header/cart/checkout, filter chips, image viewer, branded 404/419/429/500/503 pages; contact form takes phone **or** email | `migrate` (contact_messages.email nullable); `npm run build` |
 | 2026-10-25 | Admin QA pass: phone-friendly order/quote lists, unique SKUs, one level of sub-categories, Google Maps share links accepted in Store & contact | Nothing extra (no migration) |
 | 2026-10-25 | Policy page drafts (Delivery & Returns, Privacy Policy, Terms) in Website → Content pages | `php artisan db:seed --class=PolicyPagesSeeder --force` once (§6); fill in the [To confirm] parts in the admin |
+| 2026-11-01 | First deploy to GoDaddy (see "Live server"); deploy script; PHP limits for mod_lsapi in `public/.htaccess`; empty backup env values fixed | Cron must use `/opt/alt/php83/usr/bin/php` |
