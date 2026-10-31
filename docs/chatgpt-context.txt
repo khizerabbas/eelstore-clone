@@ -516,8 +516,9 @@ class CspReportController extends Controller
             $blocked   = (string) ($report['blocked-uri'] ?? $report['blockedURL'] ?? '');
             $directive = (string) ($report['effective-directive'] ?? $report['violated-directive'] ?? $report['effectiveDirective'] ?? '');
 
-            // Browser extensions inject their own code – not something the site can fix
-            if (preg_match('/^(chrome|moz|safari|ms-browser)-extension|^about:/i', $blocked)) {
+            // Browser extensions inject their own code, and GoDaddy hosting injects its visitor tracker
+            // (img1.wsimg.com/traffic-assets) – blocked on purpose, nothing for the site to fix
+            if (preg_match('#^(chrome|moz|safari|ms-browser)-extension|^about:|^https://img\d*\.wsimg\.com/traffic-assets/#i', $blocked)) {
                 continue;
             }
 
