@@ -168,7 +168,8 @@ return [
          * The password to be used for archive encryption.
          * Set to `null` to disable encryption.
          */
-        'password' => env('BACKUP_ARCHIVE_PASSWORD'),
+        // An empty "BACKUP_ARCHIVE_PASSWORD=" line means no encryption ("" would make the package try and fail)
+        'password' => env('BACKUP_ARCHIVE_PASSWORD') ?: null,
 
         /*
          * The encryption algorithm to be used for archive encryption.
@@ -330,7 +331,7 @@ return [
              * this amount of megabytes has been reached.
              * Set null for unlimited size.
              */
-            'delete_oldest_backups_when_using_more_megabytes_than' => (int) env('BACKUP_MAX_MB', 3000),
+            'delete_oldest_backups_when_using_more_megabytes_than' => (int) (env('BACKUP_MAX_MB') ?: 3000),
         ],
 
         /*
