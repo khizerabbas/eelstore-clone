@@ -37,6 +37,8 @@ Work through it top to bottom. Tick each box as you go.
 | Cron | `* * * * * cd ~/usman-electronics/current && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1` |
 | Backups | `shared/storage/app/backups/` (nightly 01:30 server time) |
 | GoDaddy placeholder page | moved to `~/public_html.godaddy-default` |
+| Domain | `usmanelectricstore.com` is the hosting's primary domain; DNS A `@` → 118.139.163.54, SPF TXT `v=spf1 ip4:118.139.163.54 include:secureserver.net ~all` |
+| SSL | GoDaddy Standard SSL (paid product, **expires 2026-12-07 – renew it**). cPanel AutoSSL is *not* in this plan. To renew/re-key: create key + CSR over SSH (`uapi SSL generate_key`, `uapi SSL generate_csr`), re-key in GoDaddy → SSL, then install with `uapi SSL install_ssl` (values must be URL-encoded, files without Windows line endings) |
 
 ## 1. Server requirements
 
@@ -332,3 +334,4 @@ php artisan up
 | 2026-10-25 | Admin QA pass: phone-friendly order/quote lists, unique SKUs, one level of sub-categories, Google Maps share links accepted in Store & contact | Nothing extra (no migration) |
 | 2026-10-25 | Policy page drafts (Delivery & Returns, Privacy Policy, Terms) in Website → Content pages | `php artisan db:seed --class=PolicyPagesSeeder --force` once (§6); fill in the [To confirm] parts in the admin |
 | 2026-11-01 | First deploy to GoDaddy (see "Live server"); deploy script; PHP limits for mod_lsapi in `public/.htaccess`; empty backup env values fixed | Cron must use `/opt/alt/php83/usr/bin/php` |
+| 2026-11-01 | usmanelectricstore.com switched from Website Builder to this hosting; GoDaddy SSL re-keyed and installed; HTTPS + no-www redirects live | Renew SSL before 2026-12-07 |
