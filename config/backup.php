@@ -216,7 +216,9 @@ return [
         'notifiable' => \Spatie\Backup\Notifications\Notifiable::class,
 
         'mail' => [
-            'to' => env('BACKUP_NOTIFY_EMAIL', env('ORDER_ADMIN_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com'))),
+            // ?: rather than env() defaults: an empty "BACKUP_NOTIFY_EMAIL=" line must fall through too,
+            // otherwise the backup package rejects "" and every artisan command fails on a fresh server
+            'to' => env('BACKUP_NOTIFY_EMAIL') ?: env('ORDER_ADMIN_EMAIL') ?: env('MAIL_FROM_ADDRESS') ?: 'hello@example.com',
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
